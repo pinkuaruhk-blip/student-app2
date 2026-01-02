@@ -1,0 +1,124 @@
+{
+  "name": "Email Inbox Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": ["INBOX"],
+          "q": "subject:[CARD:*] OR from:support@example.com"
+        }
+      },
+      "id": "gmail-trigger-1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Configure with your Gmail credentials. Adjust the filter query as needed."
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract card ID from subject or lookup by sender/content\nconst email = $input.item.json;\nconst subject = email.subject || \"\";\nconst from = email.from || \"\";\nconst body = email.snippet || email.plainText || \"\";\n\n// Try to extract card ID from subject [CARD:xxx]\nlet cardId = null;\nconst cardMatch = subject.match(/\\[CARD:([^\\]]+)\\]/);\nif (cardMatch) {\n  cardId = cardMatch[1];\n}\n\n// Extract attachments\nconst attachments = [];\nif (email.attachments && Array.isArray(email.attachments)) {\n  email.attachments.forEach(att => {\n    attachments.push({\n      name: att.filename,\n      type: att.mimeType,\n      size: att.size,\n      url: att.url || att.id // Store attachment reference\n    });\n  });\n}\n\nreturn {\n  cardId,\n  author: from,\n  body: body.substring(0, 1000), // Limit body length\n  attachments: attachments.length > 0 ? attachments : undefined,\n  subject,\n  emailId: email.id,\n  timestamp: email.internalDate || Date.now()\n};"
+      },
+      "id": "function-2",
+      "name": "Parse Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.cardId}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "if-2",
+      "name": "Has Card ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NEXT_API_URL}}/api/comments",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-SECRET",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "id": "http-2",
+      "name": "Add Comment to Card",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200],
+      "notes": "This endpoint needs to be created if you want email-to-comment functionality"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log emails without card ID for manual review\nconsole.log('Email without card ID:', $json);\nreturn $json;"
+      },
+      "id": "function-3",
+      "name": "Log Unmatched Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 400],
+      "notes": "These emails need manual processing"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "slack-1",
+      "name": "Notify Slack (Optional)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "disabled": true,
+      "notes": "Enable to get notifications about new email comments"
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [[{ "node": "Parse Email", "type": "main", "index": 0 }]]
+    },
+    "Parse Email": {
+      "main": [[{ "node": "Has Card ID?", "type": "main", "index": 0 }]]
+    },
+    "Has Card ID?": {
+      "main": [
+        [{ "node": "Add Comment to Card", "type": "main", "index": 0 }],
+        [{ "node": "Log Unmatched Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Add Comment to Card": {
+      "main": [[{ "node": "Notify Slack (Optional)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "instanceId": "your-instance-id"
+  }
+}

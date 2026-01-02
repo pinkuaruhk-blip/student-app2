@@ -1,0 +1,70 @@
+[
+  {
+    "fieldName": "ID號",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "申請時間",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "聯絡人",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "電郵",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "電話號碼",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "小學/中學",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "小學學校全名",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "小學所在地區",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "中學學校全名",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "內閣名(如有)",
+    "showOnCard": true
+  },
+  {
+    "fieldName": "競選中/已當選",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "開始競選日期",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "完成競選日期",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "競選結果公佈日期",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "申請組織",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "其他同校申請ID號",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "後備名單排名",
+    "showOnCard": true
+  }
+]

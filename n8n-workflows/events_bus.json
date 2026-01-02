@@ -1,0 +1,153 @@
+{
+  "name": "Events Bus",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "events",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-2",
+      "name": "Webhook - Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Receives events from /api/events endpoint"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse and enrich event data\nconst event = $input.item.json;\n\nreturn {\n  ...event,\n  processedAt: new Date().toISOString(),\n  workflowId: $workflow.id\n};"
+      },
+      "id": "function-4",
+      "name": "Process Event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.event}}",
+              "value2": "card.moved"
+            }
+          ]
+        }
+      },
+      "id": "switch-1",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.event}}",
+              "value2": "card.moved"
+            }
+          ]
+        },
+        "options": {
+          "mode": "expression"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "gmail-2",
+      "name": "Send Email Notification",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "disabled": true,
+      "notes": "Enable to send email notifications on card moves"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "slack-2",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "disabled": true,
+      "notes": "Enable to post card moves to Slack"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.GOOGLE_SHEETS_WEBHOOK}}",
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "id": "http-3",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400],
+      "disabled": true,
+      "notes": "Enable to log events to Google Sheets"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Handle other event types\nconsole.log('Event:', $json.event, $json);\nreturn $json;"
+      },
+      "id": "function-5",
+      "name": "Handle Other Events",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"event\": $json.event } }}"
+      },
+      "id": "respond-3",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Events": {
+      "main": [[{ "node": "Process Event", "type": "main", "index": 0 }]]
+    },
+    "Process Event": {
+      "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]]
+    },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Send Email Notification", "type": "main", "index": 0 }],
+        [{ "node": "Post to Slack", "type": "main", "index": 0 }],
+        [{ "node": "Log to Google Sheets", "type": "main", "index": 0 }],
+        [{ "node": "Handle Other Events", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Email Notification": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Post to Slack": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Log to Google Sheets": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Handle Other Events": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "instanceId": "your-instance-id"
+  }
+}

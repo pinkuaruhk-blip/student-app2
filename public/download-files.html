@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Schema File</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .file-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .file-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .file-desc {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        .instructions {
+            background: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-top: 30px;
+            border-radius: 4px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin-bottom: 8px;
+            color: #555;
+        }
+        .highlight {
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .highlight-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .highlight-box strong {
+            color: #1976d2;
+        }
+        .highlight-box code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 Download Schema File</h1>
+        <p class="subtitle">Updated schema with SMS support and templates for InstantDB</p>
+
+        <div class="file-card">
+            <div class="file-name">📄 instant.schema.ts</div>
+            <div class="file-desc">
+                Updated schema including SMS entities, templates, and relationships.
+            </div>
+            <div class="highlight-box">
+                <strong>✅ SMS Features Added:</strong><br>
+                • <code>card_sms</code> entity - SMS messages with Twilio integration<br>
+                • <code>sms_templates</code> entity - Reusable SMS templates with placeholders<br>
+                • <code>cardSmsCard</code> link - SMS to cards relationship<br>
+                • <code>smsTemplatesPipe</code> link - SMS templates to pipes relationship
+            </div>
+            <button onclick="downloadSchema()">Download instant.schema.ts</button>
+        </div>
+
+        <div class="file-card">
+            <div class="file-name">🔒 instant.perms.ts</div>
+            <div class="file-desc">
+                Permissions file with access control rules for all entities including SMS features.
+            </div>
+            <div class="highlight-box">
+                <strong>✅ Complete Permissions:</strong><br>
+                • All entities covered (read, create, update, delete)<br>
+                • <code>card_sms</code> permissions included<br>
+                • <code>sms_templates</code> permissions included<br>
+                • Requires signed-in users for all operations
+            </div>
+            <button onclick="downloadPerms()">Download instant.perms.ts</button>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instructions to Push Schema & Permissions</h3>
+            <ol>
+                <li>Click the download buttons above to save <span class="highlight">instant.schema.ts</span> and <span class="highlight">instant.perms.ts</span></li>
+                <li>Go to <a href="https://instantdb.com/dash" target="_blank">InstantDB Dashboard</a></li>
+                <li>Navigate to your app: <span class="highlight">f0827431-76de-4f51-a2c3-bae2e1558bcc</span></li>
+                <li>Go to the <strong>Schema</strong> tab</li>
+                <li>Copy the content from <span class="highlight">instant.schema.ts</span> and paste it into the schema editor</li>
+                <li>Go to the <strong>Permissions</strong> tab</li>
+                <li>Copy the content from <span class="highlight">instant.perms.ts</span> and paste it into the permissions editor</li>
+                <li>Click <strong>Apply Changes</strong> or <strong>Push</strong> for both tabs</li>
+                <li><strong>Refresh your application</strong> - SMS messaging and templates will work! 🎉</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function downloadSchema() {
+            const schemaContent = `// InstantDB Schema for FlowLane
+// This schema defines the data model for pipes, stages, cards, card fields, and comments
+
+import { i } from "@instantdb/react";
+
+// Define the schema with entities and links (relationships)
+const schema = i.schema({
+  entities: {
+    // Pipes namespace - represents a workflow/pipeline
+    pipes: i.entity({
+      name: i.string(),
+    }),
+
+    // Stages namespace - columns within a pipe
+    stages: i.entity({
+      name: i.string(),
+      position: i.number().indexed(), // For ordering stages, indexed for performance
+      backgroundColor: i.string().optional(), // Hex color for stage column background
+    }),
+
+    // Cards namespace - individual items in the pipeline
+    cards: i.entity({
+      title: i.string(),
+      description: i.string().optional(),
+      createdAt: i.number().indexed(), // Timestamp, indexed for sorting
+      updatedAt: i.number(), // Timestamp
+    }),
+
+    // Card fields namespace - custom fields for cards
+    card_fields: i.entity({
+      key: i.string(), // Field name
+      type: i.string(), // "text", "number", "date", "select", "file"
+      value: i.any(), // Flexible value storage
+      position: i.number().optional(), // For ordering fields within a card
+    }),
+
+    // Card comments namespace - comments on cards
+    card_comments: i.entity({
+      author: i.string(),
+      body: i.string(),
+      attachments: i.json().optional(), // Array of attachment objects
+      createdAt: i.number().indexed(), // Timestamp, indexed for sorting
+    }),
+
+    // Card emails namespace - email correspondence for cards
+    card_emails: i.entity({
+      direction: i.string(), // "sent" or "received"
+      from: i.string(), // Sender email address
+      to: i.string(), // Recipient email address
+      cc: i.string().optional(), // CC email addresses (comma-separated)
+      subject: i.string(),
+      body: i.string(),
+      sentAt: i.number().indexed(), // Timestamp, indexed for sorting
+      emailId: i.string().optional(), // External email ID for tracking replies
+      inReplyTo: i.string().optional(), // Reference to original email ID
+      read: i.boolean().optional(), // Whether the email has been read (true for sent, false/true for received)
+      sentVia: i.string().optional(), // How the email was sent: "automation" or undefined for manual
+    }),
+
+    // Card SMS namespace - SMS correspondence for cards
+    card_sms: i.entity({
+      direction: i.string(), // "sent" or "received"
+      from: i.string(), // Sender phone number
+      to: i.string(), // Recipient phone number
+      body: i.string(), // SMS message content
+      sentAt: i.number().indexed(), // Timestamp, indexed for sorting
+      smsId: i.string().optional(), // Twilio SMS SID for tracking
+      status: i.string().optional(), // "queued", "sent", "delivered", "failed"
+      read: i.boolean().optional(), // Whether the SMS has been read
+      sentVia: i.string().optional(), // How the SMS was sent: "automation" or undefined for manual
+    }),
+
+    // Stage forms namespace - form templates for stages
+    stage_forms: i.entity({
+      name: i.string(), // Form name
+      formType: i.string().optional(), // "client" or "admin" - defaults to client
+      fields: i.json(), // Array of field definitions: [{name, type, label, required, options}]
+      createdAt: i.number().indexed(),
+    }),
+
+    // Form submissions namespace - client form responses
+    form_submissions: i.entity({
+      responses: i.json(), // Key-value pairs of form field responses
+      submittedAt: i.number().indexed(),
+      submitterEmail: i.string().optional(), // Email of person who submitted
+    }),
+
+    // Card history namespace - track stage movements
+    card_history: i.entity({
+      movedAt: i.number().indexed(), // Timestamp when moved
+      fromStageId: i.string().optional(), // Previous stage (null if first stage)
+      toStageId: i.string(), // New stage
+      fromStageName: i.string().optional(), // Stage name snapshot
+      toStageName: i.string(), // Stage name snapshot
+    }),
+
+    // Automations namespace - workflow automation rules
+    automations: i.entity({
+      name: i.string(), // Automation rule name
+      enabled: i.boolean(), // Whether automation is active
+      triggerType: i.string(), // "form_submission", "card_enters_stage", "card_field_value", "time_based", "manual"
+      triggerConfig: i.json(), // Trigger-specific configuration
+      conditions: i.json().optional(), // Optional conditions: {logic: "AND"|"OR", rules: [{fieldKey, operator, value}]}
+      actions: i.json(), // Array of actions to execute in sequence
+      position: i.number().optional(), // For ordering automations
+      createdAt: i.number().indexed(), // Timestamp
+    }),
+
+    // Automation logs namespace - execution history
+    automation_logs: i.entity({
+      executedAt: i.number().indexed(), // Timestamp
+      status: i.string(), // "success", "error", or "skipped"
+      triggerType: i.string(), // Which trigger type fired
+      conditionsMet: i.boolean().optional(), // Whether conditions were met (null if no conditions)
+      actionsExecuted: i.json(), // Array of executed actions with results
+      errorMessage: i.string().optional(), // Error details if status is "error"
+    }),
+
+    // Email templates namespace - reusable email templates
+    email_templates: i.entity({
+      name: i.string(), // Template name
+      subject: i.string(), // Email subject line (supports placeholders)
+      body: i.string(), // Email body HTML/text (supports placeholders)
+      fromEmail: i.string().optional(), // From/Reply-to email address (optional)
+      fromName: i.string().optional(), // From display name (optional, e.g. "John Doe")
+      toEmail: i.string().optional(), // Override recipient email address (optional)
+      cc: i.string().optional(), // CC email addresses (optional, comma-separated)
+      bcc: i.string().optional(), // BCC email address (optional)
+      description: i.string().optional(), // Optional description of when to use
+      createdAt: i.number().indexed(), // Timestamp
+    }),
+
+    // SMS templates namespace - reusable SMS templates
+    sms_templates: i.entity({
+      name: i.string(), // Template name
+      body: i.string(), // SMS message body (supports placeholders)
+      description: i.string().optional(), // Optional description of when to use
+      createdAt: i.number().indexed(), // Timestamp
+    }),
+
+    // System settings namespace - global application settings
+    system_settings: i.entity({
+      defaultFromEmail: i.string().optional(), // Default sender email address
+      defaultFromName: i.string().optional(), // Default sender display name
+      globalVariables: i.json().optional(), // Global variables for email templates [{name, value}]
+    }),
+  },
+  links: {
+    // Link stages to pipes
+    stagesPipe: {
+      forward: {
+        on: "stages",
+        has: "one",
+        label: "pipe",
+      },
+      reverse: {
+        on: "pipes",
+        has: "many",
+        label: "stages",
+      },
+    },
+    // Link cards to pipes
+    cardsPipe: {
+      forward: {
+        on: "cards",
+        has: "one",
+        label: "pipe",
+      },
+      reverse: {
+        on: "pipes",
+        has: "many",
+        label: "cards",
+      },
+    },
+    // Link cards to stages
+    cardsStage: {
+      forward: {
+        on: "cards",
+        has: "one",
+        label: "stage",
+      },
+      reverse: {
+        on: "stages",
+        has: "many",
+        label: "cards",
+      },
+    },
+    // Link card fields to cards
+    cardFieldsCard: {
+      forward: {
+        on: "card_fields",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "fields",
+      },
+    },
+    // Link card comments to cards
+    cardCommentsCard: {
+      forward: {
+        on: "card_comments",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "comments",
+      },
+    },
+    // Link card emails to cards
+    cardEmailsCard: {
+      forward: {
+        on: "card_emails",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "emails",
+      },
+    },
+    // Link card SMS to cards
+    cardSmsCard: {
+      forward: {
+        on: "card_sms",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "sms",
+      },
+    },
+    // Link stage forms to stages
+    stageFormsStage: {
+      forward: {
+        on: "stage_forms",
+        has: "one",
+        label: "stage",
+      },
+      reverse: {
+        on: "stages",
+        has: "many",
+        label: "forms",
+      },
+    },
+    // Link form submissions to cards
+    formSubmissionsCard: {
+      forward: {
+        on: "form_submissions",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "form_submissions",
+      },
+    },
+    // Link form submissions to stage forms
+    formSubmissionsForm: {
+      forward: {
+        on: "form_submissions",
+        has: "one",
+        label: "form",
+      },
+      reverse: {
+        on: "stage_forms",
+        has: "many",
+        label: "submissions",
+      },
+    },
+    // Link card history to cards
+    cardHistoryCard: {
+      forward: {
+        on: "card_history",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "history",
+      },
+    },
+    // Link automations to pipes
+    automationsPipe: {
+      forward: {
+        on: "automations",
+        has: "one",
+        label: "pipe",
+      },
+      reverse: {
+        on: "pipes",
+        has: "many",
+        label: "automations",
+      },
+    },
+    // Link automations to stages (optional - for stage-specific automations)
+    automationsStage: {
+      forward: {
+        on: "automations",
+        has: "one",
+        label: "stage",
+      },
+      reverse: {
+        on: "stages",
+        has: "many",
+        label: "automations",
+      },
+    },
+    // Link automation logs to cards
+    automationLogsCard: {
+      forward: {
+        on: "automation_logs",
+        has: "one",
+        label: "card",
+      },
+      reverse: {
+        on: "cards",
+        has: "many",
+        label: "automation_logs",
+      },
+    },
+    // Link automation logs to automations
+    automationLogsAutomation: {
+      forward: {
+        on: "automation_logs",
+        has: "one",
+        label: "automation",
+      },
+      reverse: {
+        on: "automations",
+        has: "many",
+        label: "logs",
+      },
+    },
+    // Link email templates to pipes
+    emailTemplatesPipe: {
+      forward: {
+        on: "email_templates",
+        has: "one",
+        label: "pipe",
+      },
+      reverse: {
+        on: "pipes",
+        has: "many",
+        label: "email_templates",
+      },
+    },
+    // Link SMS templates to pipes
+    smsTemplatesPipe: {
+      forward: {
+        on: "sms_templates",
+        has: "one",
+        label: "pipe",
+      },
+      reverse: {
+        on: "pipes",
+        has: "many",
+        label: "sms_templates",
+      },
+    },
+  },
+  rules: {
+    allow: {
+      pipes: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+      stages: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+      cards: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+      card_fields: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+      emails: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+      email_templates: {
+        bind: ["isSignedIn"],
+        allow: {
+          read: "isSignedIn",
+        },
+      },
+    },
+  },
+});
+
+export default schema;
+
+// TypeScript types for the schema
+export type Schema = typeof schema;
+`;
+
+            const blob = new Blob([schemaContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'instant.schema.ts';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function downloadPerms() {
+            const permsContent = `// InstantDB Permissions for FlowLane
+// This file defines access control rules for all entities
+
+export default {
+  allow: {
+    // Pipes - workflow/pipeline access
+    pipes: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Stages - columns within pipes
+    stages: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Cards - individual items in the pipeline
+    cards: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Card fields - custom fields for cards
+    card_fields: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Card comments
+    card_comments: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Card emails
+    card_emails: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Card SMS - NEW!
+    card_sms: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Stage forms
+    stage_forms: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Form submissions
+    form_submissions: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Card history
+    card_history: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Automations
+    automations: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Automation logs
+    automation_logs: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Email templates
+    email_templates: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // SMS templates
+    sms_templates: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // System settings
+    system_settings: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+  },
+};
+`;
+
+            const blob = new Blob([permsContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'instant.perms.ts';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+{
+  "name": "Formbricks Intake Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "formbricks-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - Formbricks",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Map Formbricks submission to our card format\nconst formData = $input.item.json;\n\n// Extract fields from form submission\n// Adjust this mapping based on your Formbricks form structure\nconst pipeId = formData.pipeId || formData.data?.pipeId;\nconst stageId = formData.stageId || formData.data?.stageId;\nconst title = formData.title || formData.data?.title || \"Untitled\";\nconst description = formData.description || formData.data?.description || \"\";\n\n// Map custom fields\nconst fields = [];\nif (formData.data) {\n  for (const [key, value] of Object.entries(formData.data)) {\n    if (!['pipeId', 'stageId', 'title', 'description'].includes(key)) {\n      fields.push({\n        key,\n        type: typeof value === 'number' ? 'number' : 'text',\n        value\n      });\n    }\n  }\n}\n\n// Handle file uploads if present\nif (formData.files && Array.isArray(formData.files)) {\n  formData.files.forEach((file, index) => {\n    fields.push({\n      key: `file_${index + 1}`,\n      type: 'file',\n      value: file.url || file.path\n    });\n  });\n}\n\nreturn {\n  pipeId,\n  stageId,\n  title,\n  description,\n  fields\n};"
+      },
+      "id": "function-1",
+      "name": "Map Form Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.NEXT_API_URL}}/api/intake/formbricks",
+        "authentication": "headerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-FORMBRICKS-SECRET",
+              "value": "={{$env.FORMBRICKS_SHARED_SECRET}}"
+            }
+          ]
+        },
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      },
+      "id": "http-1",
+      "name": "Create Card via API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.success}}",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "gmail-1",
+      "name": "Send Confirmation Email (Optional)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1050, 200],
+      "disabled": true,
+      "notes": "Enable and configure if you want to send confirmation emails"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"cardId\": $json.cardId } }}"
+      },
+      "id": "respond-1",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Failed to create card\" } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-2",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Webhook - Formbricks": {
+      "main": [[{ "node": "Map Form Data", "type": "main", "index": 0 }]]
+    },
+    "Map Form Data": {
+      "main": [[{ "node": "Create Card via API", "type": "main", "index": 0 }]]
+    },
+    "Create Card via API": {
+      "main": [[{ "node": "Check Success", "type": "main", "index": 0 }]]
+    },
+    "Check Success": {
+      "main": [
+        [{ "node": "Respond Success", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "instanceId": "your-instance-id"
+  }
+}

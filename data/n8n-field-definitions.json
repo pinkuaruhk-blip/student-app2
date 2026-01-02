@@ -1,0 +1,82 @@
+[
+  {
+    "name": "ID號",
+    "type": "text",
+    "position": 0
+  },
+  {
+    "name": "申請時間",
+    "type": "text",
+    "position": 1
+  },
+  {
+    "name": "聯絡人",
+    "type": "text",
+    "position": 2
+  },
+  {
+    "name": "電郵",
+    "type": "text",
+    "position": 3
+  },
+  {
+    "name": "電話號碼",
+    "type": "text",
+    "position": 4
+  },
+  {
+    "name": "小學/中學",
+    "type": "text",
+    "position": 5
+  },
+  {
+    "name": "小學所在地區",
+    "type": "text",
+    "position": 6
+  },
+  {
+    "name": "學校全名",
+    "type": "text",
+    "position": 7
+  },
+  {
+    "name": "內閣名(如有)",
+    "type": "text",
+    "position": 8
+  },
+  {
+    "name": "競選中/已當選",
+    "type": "text",
+    "position": 9
+  },
+  {
+    "name": "開始競選日期",
+    "type": "text",
+    "position": 10
+  },
+  {
+    "name": "完成競選日期",
+    "type": "text",
+    "position": 11
+  },
+  {
+    "name": "競選結果公佈日期",
+    "type": "text",
+    "position": 12
+  },
+  {
+    "name": "其他同校申請ID號",
+    "type": "text",
+    "position": 13
+  },
+  {
+    "name": "後備名單排名",
+    "type": "text",
+    "position": 14
+  },
+  {
+    "name": "申請組織",
+    "type": "text",
+    "position": 15
+  }
+]
