@@ -27,7 +27,7 @@ export async function checkAndExecuteAutomations(params: {
 }) {
   try {
     // Query all enabled automations for this pipe with this trigger type
-    const { data } = await db.query({
+    const data = await db.query({
       automations: {
         $: {
           where: {
@@ -180,7 +180,7 @@ async function executeAutomation(automation: any, cardId: string) {
  */
 async function evaluateConditions(conditions: any, cardId: string): Promise<boolean> {
   // Query card to get all fields
-  const { data } = await db.query({
+  const data = await db.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -273,7 +273,7 @@ async function executeMoveCardAction(
   cardId: string
 ): Promise<any> {
   // Query card to get current stage
-  const { data } = await db.query({
+  const data = await db.query({
     cards: {
       $: { where: { id: cardId } },
       stage: {},
@@ -286,7 +286,7 @@ async function executeMoveCardAction(
   const oldStage = card.stage;
 
   // Query new stage
-  const { data: stageData } = await db.query({
+  const stageData = await db.query({
     stages: {
       $: { where: { id: config.targetStageId } },
     },
@@ -326,7 +326,7 @@ async function executeSendFormLinkAction(
   cardId: string
 ): Promise<any> {
   // Query card with all necessary data
-  const { data } = await db.query({
+  const data = await db.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -366,7 +366,7 @@ async function executeSendFormLinkAction(
   let bcc: string | undefined;
 
   if (config.templateId) {
-    const { data: templateData } = await db.query({
+    const templateData = await db.query({
       email_templates: {
         $: { where: { id: config.templateId } },
       },
@@ -440,7 +440,7 @@ async function executeSendEmailAction(
   cardId: string
 ): Promise<any> {
   // Query card with all necessary data
-  const { data } = await db.query({
+  const data = await db.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -465,7 +465,7 @@ async function executeSendEmailAction(
   }
 
   // Load email template
-  const { data: templateData } = await db.query({
+  const templateData = await db.query({
     email_templates: {
       $: { where: { id: config.templateId } },
     },
@@ -540,7 +540,7 @@ async function executeUpdateFieldAction(
   cardId: string
 ): Promise<any> {
   // Query card to find the field
-  const { data } = await db.query({
+  const data = await db.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},

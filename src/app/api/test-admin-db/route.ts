@@ -35,39 +35,22 @@ export async function GET() {
       pipes: {},
     });
 
-    const { data, error } = resultWithSchema;
-
-    if (error) {
-      return NextResponse.json({
-        success: false,
-        error: "Query failed",
-        details: error,
-        envCheck: {
-          appId,
-          adminKeyPrefix: adminKey?.substring(0, 10),
-          adminKeyLength: adminKey?.length,
-        },
-      });
-    }
-
     return NextResponse.json({
       success: true,
       message: "Admin DB is working",
       tests: {
         withSchema: {
-          automations: resultWithSchema.data?.automations?.length || 0,
-          pipes: resultWithSchema.data?.pipes?.length || 0,
-          error: resultWithSchema.error || null,
+          automations: resultWithSchema?.automations?.length || 0,
+          pipes: resultWithSchema?.pipes?.length || 0,
         },
         withoutSchema: {
-          automations: resultNoSchema.data?.automations?.length || 0,
-          pipes: resultNoSchema.data?.pipes?.length || 0,
-          error: resultNoSchema.error || null,
+          automations: resultNoSchema?.automations?.length || 0,
+          pipes: resultNoSchema?.pipes?.length || 0,
         },
       },
       sampleData: {
-        automationIds: data?.automations?.slice(0, 3).map((a: any) => ({ id: a.id, name: a.name })) || [],
-        pipeIds: data?.pipes?.slice(0, 3).map((p: any) => p.id) || [],
+        automationIds: resultWithSchema?.automations?.slice(0, 3).map((a: any) => ({ id: a.id, name: a.name })) || [],
+        pipeIds: resultWithSchema?.pipes?.slice(0, 3).map((p: any) => p.id) || [],
       },
       envCheck: {
         adminKeySet: !!adminKey,

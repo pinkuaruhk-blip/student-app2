@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Query automations directly using local db instance
     console.log("🔍 Querying pipe with ID:", pipeId);
 
-    const { data } = await db.query({
+    const data = await db.query({
       pipes: {
         $: { where: { id: pipeId } },
         automations: {},

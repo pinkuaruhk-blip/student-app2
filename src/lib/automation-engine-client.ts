@@ -42,7 +42,7 @@ export async function checkAndExecuteAutomations(params: {
     });
 
     // Query the pipe and its automations using client SDK
-    const { data } = await db.queryOnce({
+    const data = await db.queryOnce({
       pipes: {
         $: {
           where: {
@@ -254,7 +254,7 @@ async function executeAutomation(automation: any, cardId: string) {
 }
 
 async function evaluateConditions(conditions: any, cardId: string): Promise<boolean> {
-  const { data } = await db.queryOnce({
+  const data = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -351,7 +351,7 @@ async function executeSendFormLinkAction(
   config: { formId: string; recipientField?: string; templateId?: string },
   cardId: string
 ): Promise<any> {
-  const { data } = await db.queryOnce({
+  const data = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -380,7 +380,7 @@ async function executeSendFormLinkAction(
 
   // Load and process email template if specified
   if (config.templateId) {
-    const { data: templateData } = await db.queryOnce({
+    const templateData = await db.queryOnce({
       email_templates: { $: { where: { id: config.templateId } } },
     });
 
@@ -449,7 +449,7 @@ async function executeSendEmailAction(
   config: { recipientField?: string; templateId: string },
   cardId: string
 ): Promise<any> {
-  const { data } = await db.queryOnce({
+  const data = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -528,7 +528,7 @@ async function executeMoveCardAction(
   cardId: string
 ): Promise<any> {
   // Get card's pipe ID before moving
-  const { data } = await db.queryOnce({
+  const data = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
       stage: { pipe: {} },
@@ -571,7 +571,7 @@ async function executeUpdateFieldAction(
   config: { fieldKey: string; value: any },
   cardId: string
 ): Promise<any> {
-  const { data } = await db.queryOnce({
+  const data = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
