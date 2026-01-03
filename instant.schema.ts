@@ -368,46 +368,6 @@ const schema = i.schema({
       },
     },
   },
-  rules: {
-    allow: {
-      pipes: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      stages: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      cards: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      card_fields: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      emails: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      email_templates: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-    },
-  },
 });
 
 export default schema;
