@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log("🔍 Querying system_settings from admin DB...");
 
-    const { data } = await adminDb.query({
+    const data = await adminDb.query({
       system_settings: {},
     });
 
