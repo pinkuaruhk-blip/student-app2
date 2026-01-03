@@ -76,10 +76,10 @@ function evaluateFieldVisibility(
 }
 
 interface PageProps {
-  params: {
+  params: Promise<{
     cardId: string;
     formId: string;
-  };
+  }>;
 }
 
 export default function PublicFormPage({ params }: PageProps) {
