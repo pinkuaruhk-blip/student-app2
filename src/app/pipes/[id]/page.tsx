@@ -204,7 +204,7 @@ export default function KanbanPage() {
       .then(res => res.json())
       .then(data => {
         if (data.settings) {
-          const visible = new Set(
+          const visible = new Set<string>(
             data.settings
               .filter((s: any) => s.showOnCard)
               .map((s: any) => s.fieldName)
@@ -249,7 +249,7 @@ export default function KanbanPage() {
   const { user } = db.useAuth();
 
   const pipe = data?.pipes?.[0];
-  const stages = (pipe?.stages?.sort((a: any, b: any) => a.position - b.position) || []) as Stage[];
+  const stages = (pipe?.stages?.sort((a: any, b: any) => a.position - b.position) || []) as any[];
   const emailTemplates = pipe?.email_templates || [];
   const systemSettings = data?.system_settings?.[0];
 

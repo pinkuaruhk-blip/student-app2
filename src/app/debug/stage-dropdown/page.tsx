@@ -193,7 +193,7 @@ export default function StageDropdownPage() {
                     const isActual = stage.id === actualStageId;
 
                     let rowClass = "";
-                    const statusBadges = [];
+                    const statusBadges: React.ReactElement[] = [];
 
                     if (isConfigured) {
                       rowClass = "bg-yellow-100 border-l-4 border-yellow-500";

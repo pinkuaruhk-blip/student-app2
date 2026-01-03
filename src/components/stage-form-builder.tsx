@@ -87,13 +87,13 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
 
   // Query existing form if editing
   const { data, isLoading } = db.useQuery(
-    existingFormId
+    (existingFormId
       ? {
           stage_forms: {
             $: { where: { id: existingFormId } },
           },
         }
-      : { stage_forms: {} }
+      : { stage_forms: {} }) as any
   );
 
   // Query the stage to get its pipe, and all forms in that pipe
@@ -117,7 +117,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
   ) || [];
 
   // Load existing form data
-  const existingForm = existingFormId ? data?.stage_forms?.[0] : null;
+  const existingForm = existingFormId ? (data as any)?.stage_forms?.[0] : null;
 
   // Initialize form data when editing (using useEffect to avoid state update issues)
   useEffect(() => {
