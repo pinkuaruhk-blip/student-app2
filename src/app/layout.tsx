@@ -1,25 +1,17 @@
 import type { Metadata } from "next";
-import { Noto_Sans, Noto_Sans_TC, Noto_Sans_SC } from "next/font/google";
+import { Noto_Sans_SC, Noto_Sans_TC } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/contexts/toast-context";
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 
-const notoSans = Noto_Sans({
-  variable: "--font-noto-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const notoSansTC = Noto_Sans_TC({
-  variable: "--font-noto-sans-tc",
-  weight: ["400", "500", "600", "700"],
+const notoSansSC = Noto_Sans_SC({
+  weight: ['400', '500', '700'],
   preload: false
 });
 
-const notoSansSC = Noto_Sans_SC({
-  variable: "--font-noto-sans-sc",
-  weight: ["400", "500", "600", "700"],
+const notoSansTC = Noto_Sans_TC({
+  weight: ['400', '500', '700'],
   preload: false
 });
 
@@ -38,7 +30,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${notoSans.variable} ${notoSansTC.variable} ${notoSansSC.variable} antialiased`}
+        className="antialiased"
       >
         <NextIntlClientProvider messages={messages}>
           <ToastProvider>

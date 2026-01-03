@@ -190,7 +190,7 @@ export default function SettingsPage() {
       return;
     }
 
-    let updatedFields = [...customFields];
+    const updatedFields = [...customFields];
 
     if (editingFieldIndex !== null) {
       // Update existing field
@@ -280,7 +280,7 @@ export default function SettingsPage() {
       return;
     }
 
-    let updatedVariables = [...globalVariables];
+    const updatedVariables = [...globalVariables];
 
     if (editingVarIndex !== null) {
       // Update existing variable
