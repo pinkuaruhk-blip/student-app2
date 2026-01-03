@@ -136,7 +136,7 @@ export default function StageMappingPage() {
                 <p className="text-sm mt-1">
                   <span className="font-medium">Stage Name:</span>{" "}
                   <span className="text-green-600 font-semibold">
-                    {stages.find((s: any) => s.id === "fd79352d-8653-47e1-95dc-150565bb99f5").name}
+                    {stages.find((s: any) => s.id === "fd79352d-8653-47e1-95dc-150565bb99f5")?.name}
                   </span>
                 </p>
               ) : (
@@ -152,7 +152,7 @@ export default function StageMappingPage() {
                 <p className="text-sm mt-1">
                   <span className="font-medium">Stage Name:</span>{" "}
                   <span className="text-orange-600 font-semibold">
-                    {stages.find((s: any) => s.id === "390624f3-0e50-465c-a0e2-2e4fb3449557").name}
+                    {stages.find((s: any) => s.id === "390624f3-0e50-465c-a0e2-2e4fb3449557")?.name}
                   </span>
                 </p>
               ) : (

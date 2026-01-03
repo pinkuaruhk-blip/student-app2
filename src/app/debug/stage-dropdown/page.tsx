@@ -119,7 +119,7 @@ export default function StageDropdownPage() {
                 Stage Name:{" "}
                 {stages.find((s: any) => s.id === expectedStageId) ? (
                   <span className="text-green-600 text-lg">
-                    {stages.find((s: any) => s.id === expectedStageId).name}
+                    {stages.find((s: any) => s.id === expectedStageId)?.name}
                   </span>
                 ) : (
                   <span className="text-red-600">NOT IN THIS PIPE</span>
@@ -135,7 +135,7 @@ export default function StageDropdownPage() {
                 Stage Name:{" "}
                 {stages.find((s: any) => s.id === actualStageId) ? (
                   <span className="text-orange-600 text-lg">
-                    {stages.find((s: any) => s.id === actualStageId).name}
+                    {stages.find((s: any) => s.id === actualStageId)?.name}
                   </span>
                 ) : (
                   <span className="text-red-600">NOT IN THIS PIPE</span>
