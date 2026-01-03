@@ -48,7 +48,7 @@ export async function checkAndExecuteAutomations(params: {
     });
 
     // First, try to query ALL pipes to see if adminDb works at all
-    const { data: allPipesData } = await adminDb.query({
+    const allPipesData = await adminDb.query({
       pipes: {},
     });
 
@@ -58,7 +58,7 @@ export async function checkAndExecuteAutomations(params: {
     }
 
     // Query the specific pipe and its automations
-    const { data } = await adminDb.query({
+    const data = await adminDb.query({
       pipes: {
         $: {
           where: {
@@ -324,7 +324,7 @@ async function executeAutomation(automation: any, cardId: string) {
  */
 async function evaluateConditions(conditions: any, cardId: string): Promise<boolean> {
   // Query card to get all fields
-  const { data } = await adminDb.query({
+  const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -417,7 +417,7 @@ async function executeMoveCardAction(
   cardId: string
 ): Promise<any> {
   // Query card to get current stage
-  const { data } = await adminDb.query({
+  const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
       stage: {},
@@ -430,7 +430,7 @@ async function executeMoveCardAction(
   const oldStage = card.stage;
 
   // Query new stage
-  const { data: stageData } = await adminDb.query({
+  const stageData = await adminDb.query({
     stages: {
       $: { where: { id: config.targetStageId } },
     },
@@ -470,7 +470,7 @@ async function executeSendFormLinkAction(
   cardId: string
 ): Promise<any> {
   // Query card with all necessary data
-  const { data } = await adminDb.query({
+  const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -512,7 +512,7 @@ async function executeSendFormLinkAction(
   if (config.templateId) {
     // Force recompile
     // Query template with explicit field selection
-    const { data: templateData } = await adminDb.query({
+    const templateData = await adminDb.query({
       email_templates: {
         $: {
           where: { id: config.templateId },
@@ -601,7 +601,7 @@ async function executeSendEmailAction(
   cardId: string
 ): Promise<any> {
   // Query card with all necessary data
-  const { data } = await adminDb.query({
+  const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},
@@ -626,7 +626,7 @@ async function executeSendEmailAction(
   }
 
   // Load email template
-  const { data: templateData } = await adminDb.query({
+  const templateData = await adminDb.query({
     email_templates: {
       $: {
         where: { id: config.templateId },
@@ -722,7 +722,7 @@ async function executeUpdateFieldAction(
   cardId: string
 ): Promise<any> {
   // Query card to find the field
-  const { data } = await adminDb.query({
+  const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
       fields: {},

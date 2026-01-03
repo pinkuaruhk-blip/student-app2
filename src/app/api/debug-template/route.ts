@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const template = result?.data?.email_templates?.[0];
+    const template = result?.email_templates?.[0];
 
     return NextResponse.json({
       found: !!template,
