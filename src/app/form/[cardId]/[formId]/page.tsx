@@ -11,7 +11,7 @@ interface FormField {
   id: string;
   name: string;
   label: string;
-  type: "text" | "email" | "number" | "textarea" | "select" | "checkbox" | "radio" | "file" | "content";
+  type: "text" | "email" | "number" | "textarea" | "select" | "checkbox" | "radio" | "file" | "content" | "date" | "time";
   required: boolean;
   options?: string[];
   content?: string;
