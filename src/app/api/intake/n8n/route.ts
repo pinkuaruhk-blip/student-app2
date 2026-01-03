@@ -327,8 +327,8 @@ export async function POST(request: NextRequest) {
             });
 
             const conditionsMet = auto.conditions.logic === "AND"
-              ? results.every((r) => r)
-              : results.some((r) => r);
+              ? results.every((r: boolean) => r)
+              : results.some((r: boolean) => r);
 
             console.log(`    ${conditionsMet ? "✅" : "❌"} Conditions ${conditionsMet ? "met" : "not met"}`);
 
@@ -420,8 +420,8 @@ export async function POST(request: NextRequest) {
                       });
 
                       const conditionsMet = followAuto.conditions.logic === "AND"
-                        ? results.every((r) => r)
-                        : results.some((r) => r);
+                        ? results.every((r: boolean) => r)
+                        : results.some((r: boolean) => r);
 
                       log(`      ${conditionsMet ? "✅" : "❌"} Conditions ${conditionsMet ? "met" : "not met"}`);
 

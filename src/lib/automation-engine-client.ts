@@ -303,9 +303,9 @@ async function evaluateConditions(conditions: any, cardId: string): Promise<bool
   });
 
   if (logic === "AND") {
-    return results.every((r) => r);
+    return results.every((r: boolean) => r);
   } else {
-    return results.some((r) => r);
+    return results.some((r: boolean) => r);
   }
 }
 
