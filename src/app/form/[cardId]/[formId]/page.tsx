@@ -15,6 +15,7 @@ interface FormField {
   required: boolean;
   options?: string[];
   content?: string;
+  description?: string;
   acceptedFileTypes?: string;
   conditions?: {
     logic: "AND" | "OR";
