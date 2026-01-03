@@ -14,11 +14,13 @@ const notoSans = Noto_Sans({
 const notoSansTC = Noto_Sans_TC({
   variable: "--font-noto-sans-tc",
   weight: ["400", "500", "600", "700"],
+  preload: false
 });
 
 const notoSansSC = Noto_Sans_SC({
   variable: "--font-noto-sans-sc",
   weight: ["400", "500", "600", "700"],
+  preload: false
 });
 
 export const metadata: Metadata = {
