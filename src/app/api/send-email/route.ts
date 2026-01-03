@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (cardData) {
       // Fetch form submissions for this card to support form placeholders
-      let formSubmissions = [];
+      let formSubmissions: any[] = [];
       if (cardId) {
         try {
           const { init } = await import("@instantdb/admin");

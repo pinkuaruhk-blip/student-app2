@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Found ${matchingAutomations.length} matching automations`);
 
     // Execute each matching automation
-    const executedAutomations = [];
-    const failedAutomations = [];
+    const executedAutomations: string[] = [];
+    const failedAutomations: Array<{ name: string; error: string }> = [];
 
     for (const automation of matchingAutomations) {
       console.log(`▶️ Executing automation: ${automation.name}`);

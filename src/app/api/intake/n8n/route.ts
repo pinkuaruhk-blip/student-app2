@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
         const card = cardData?.cards?.[0];
 
         // Filter matching automations (checking both trigger AND conditions)
-        const matchingAutomations = [];
+        const matchingAutomations: any[] = [];
 
         for (const auto of pipe.automations || []) {
           // Check if trigger matches
@@ -343,9 +343,9 @@ export async function POST(request: NextRequest) {
 
         console.log(`📋 Found ${matchingAutomations.length} matching automations (with conditions checked)`);
 
-        const executedAutomations = [];
-        const failedAutomations = [];
-        const followUpExecuted = []; // Track follow-up automations
+        const executedAutomations: string[] = [];
+        const failedAutomations: Array<{ name: string; error: string }> = [];
+        const followUpExecuted: string[] = []; // Track follow-up automations
 
         // Execute each automation
         for (const automation of matchingAutomations) {
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
                   log(`  🔍 Checking ${pipe.automations?.length || 0} automations for follow-up`);
                   log(`  🎯 Looking for automations with stageId: ${targetStageId}`);
 
-                  const followUpAutomations = [];
+                  const followUpAutomations: any[] = [];
                   for (const followAuto of pipe.automations || []) {
                     log(`    • Checking automation: "${followAuto.name}"`);
                     log(`      - Enabled: ${followAuto.enabled}`);

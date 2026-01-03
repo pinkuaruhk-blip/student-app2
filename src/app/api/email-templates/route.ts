@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Load existing templates
-    let templates = [];
+    let templates: any[] = [];
     if (existsSync(TEMPLATES_FILE)) {
       const content = await readFile(TEMPLATES_FILE, "utf-8");
       templates = JSON.parse(content);
