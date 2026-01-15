@@ -143,6 +143,7 @@ const schema = i.schema({
       defaultFromEmail: i.string().optional(), // Default sender email address
       defaultFromName: i.string().optional(), // Default sender display name
       globalVariables: i.json().optional(), // Global variables for email templates [{name, value}]
+      kanbanDisplaySettings: i.json().optional(), // Kanban field visibility settings [{fieldName, showOnCard}]
     }),
 
     // Field definitions namespace - n8n field mappings

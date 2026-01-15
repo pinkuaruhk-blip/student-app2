@@ -104,7 +104,7 @@
 <body>
     <div class="container">
         <h1>📥 Download Schema File</h1>
-        <p class="subtitle">Updated schema with field definitions, SMS support and templates for InstantDB</p>
+        <p class="subtitle">Updated schema with Kanban display settings, field definitions, SMS support and templates for InstantDB</p>
 
         <div class="file-card">
             <div class="file-name">📄 instant.schema.ts</div>
@@ -113,7 +113,8 @@
             </div>
             <div class="highlight-box">
                 <strong>✅ Latest Features:</strong><br>
-                • <code>field_definitions</code> entity - n8n field mappings (NEW!)<br>
+                • <code>kanbanDisplaySettings</code> in system_settings - Field visibility for Kanban (NEW!)<br>
+                • <code>field_definitions</code> entity - n8n field mappings<br>
                 • <code>card_sms</code> entity - SMS messages with Twilio integration<br>
                 • <code>sms_templates</code> entity - Reusable SMS templates with placeholders<br>
                 • <code>cardSmsCard</code> link - SMS to cards relationship<br>
@@ -300,6 +301,7 @@ const schema = i.schema({
       defaultFromEmail: i.string().optional(), // Default sender email address
       defaultFromName: i.string().optional(), // Default sender display name
       globalVariables: i.json().optional(), // Global variables for email templates [{name, value}]
+      kanbanDisplaySettings: i.json().optional(), // Kanban field visibility settings [{fieldName, showOnCard}]
     }),
 
     // Field definitions namespace - n8n field mappings
@@ -700,6 +702,16 @@ export default {
     },
     // System settings
     system_settings: {
+      bind: ["isSignedIn"],
+      allow: {
+        read: "isSignedIn",
+        create: "isSignedIn",
+        update: "isSignedIn",
+        delete: "isSignedIn",
+      },
+    },
+    // Field definitions
+    field_definitions: {
       bind: ["isSignedIn"],
       allow: {
         read: "isSignedIn",

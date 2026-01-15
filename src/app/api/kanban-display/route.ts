@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-
-const SETTINGS_FILE = "/home/vibecode/workspace/data/kanban-display-settings.json";
+import { adminDb } from "@/lib/db-admin";
+import { id } from "@instantdb/admin";
 
 /**
- * GET - Retrieve Kanban display settings
- * POST - Save Kanban display settings
+ * GET - Retrieve Kanban display settings from database
+ * POST - Save Kanban display settings to database
  */
 
 export async function GET() {
   try {
-    if (!existsSync(SETTINGS_FILE)) {
-      return NextResponse.json({ settings: [] });
-    }
+    // Query system settings from database
+    const systemSettings = await adminDb.query({
+      system_settings: {},
+    });
 
-    const content = await readFile(SETTINGS_FILE, "utf-8");
-    const settings = JSON.parse(content);
+    const settings = systemSettings?.system_settings?.[0];
+    const kanbanDisplaySettings = settings?.kanbanDisplaySettings || [];
 
-    return NextResponse.json({ settings });
+    return NextResponse.json({ settings: kanbanDisplaySettings });
   } catch (error: any) {
     console.error("Failed to read Kanban display settings:", error);
     return NextResponse.json({ settings: [] });
@@ -36,13 +35,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure data directory exists
-    const dataDir = "/home/vibecode/workspace/data";
-    if (!existsSync(dataDir)) {
-      await mkdir(dataDir, { recursive: true });
-    }
+    // Get existing system settings or create new ID
+    const systemSettingsResult = await adminDb.query({
+      system_settings: {},
+    });
 
-    await writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    const existingSettings = systemSettingsResult?.system_settings?.[0];
+    const settingsId = existingSettings?.id || id();
+
+    // Save to database
+    await adminDb.transact([
+      adminDb.tx.system_settings[settingsId].update({
+        kanbanDisplaySettings: settings,
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
