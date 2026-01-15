@@ -104,15 +104,16 @@
 <body>
     <div class="container">
         <h1>📥 Download Schema File</h1>
-        <p class="subtitle">Updated schema with SMS support and templates for InstantDB</p>
+        <p class="subtitle">Updated schema with field definitions, SMS support and templates for InstantDB</p>
 
         <div class="file-card">
             <div class="file-name">📄 instant.schema.ts</div>
             <div class="file-desc">
-                Updated schema including SMS entities, templates, and relationships.
+                Updated schema including field definitions for n8n, SMS entities, templates, and relationships.
             </div>
             <div class="highlight-box">
-                <strong>✅ SMS Features Added:</strong><br>
+                <strong>✅ Latest Features:</strong><br>
+                • <code>field_definitions</code> entity - n8n field mappings (NEW!)<br>
                 • <code>card_sms</code> entity - SMS messages with Twilio integration<br>
                 • <code>sms_templates</code> entity - Reusable SMS templates with placeholders<br>
                 • <code>cardSmsCard</code> link - SMS to cards relationship<br>
@@ -299,6 +300,14 @@ const schema = i.schema({
       defaultFromEmail: i.string().optional(), // Default sender email address
       defaultFromName: i.string().optional(), // Default sender display name
       globalVariables: i.json().optional(), // Global variables for email templates [{name, value}]
+    }),
+
+    // Field definitions namespace - n8n field mappings
+    field_definitions: i.entity({
+      name: i.string(), // Field name from n8n form (technical key)
+      label: i.string(), // Display label (human-readable)
+      type: i.string(), // "text", "number", "date", "select", "file"
+      position: i.number().indexed(), // Display order, indexed for sorting
     }),
   },
   links: {
@@ -521,46 +530,6 @@ const schema = i.schema({
         on: "pipes",
         has: "many",
         label: "sms_templates",
-      },
-    },
-  },
-  rules: {
-    allow: {
-      pipes: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      stages: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      cards: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      card_fields: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      emails: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
-      },
-      email_templates: {
-        bind: ["isSignedIn"],
-        allow: {
-          read: "isSignedIn",
-        },
       },
     },
   },

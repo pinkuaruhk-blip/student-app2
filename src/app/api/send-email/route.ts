@@ -62,19 +62,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get default email configuration from environment variables
-    const defaultFromEmail = process.env.DEFAULT_FROM_EMAIL || "system";
-    const defaultFromName = process.env.DEFAULT_FROM_NAME || undefined;
+    // Fetch system settings from database (used for email defaults and global variables)
+    let systemSettingsData = null;
+    try {
+      const systemSettings = await adminDb.query({
+        system_settings: {},
+      });
+      systemSettingsData = systemSettings?.system_settings?.[0];
+    } catch (error) {
+      log("⚠️ Error fetching system settings from database:", error);
+    }
 
-    log("Default from env:", defaultFromEmail);
-    log("Default name from env:", defaultFromName || "(none)");
+    // Get email configuration from database first, then fall back to environment variables
+    let defaultFromEmail = process.env.DEFAULT_FROM_EMAIL || "system";
+    let defaultFromName = process.env.DEFAULT_FROM_NAME || undefined;
 
-    // Apply sender fallback hierarchy: template > system defaults > hardcoded
+    // Use database values if available, otherwise fall back to env vars
+    if (systemSettingsData?.defaultFromEmail) {
+      defaultFromEmail = systemSettingsData.defaultFromEmail;
+      log("Using defaultFromEmail from database:", defaultFromEmail);
+    } else {
+      log("Using defaultFromEmail from env:", defaultFromEmail);
+    }
+
+    if (systemSettingsData?.defaultFromName) {
+      defaultFromName = systemSettingsData.defaultFromName;
+      log("Using defaultFromName from database:", defaultFromName);
+    } else {
+      log("Using defaultFromName from env:", defaultFromName || "(none)");
+    }
+
+    // Apply sender fallback hierarchy: template > database/system defaults > env vars
     const effectiveFromEmail = from || defaultFromEmail;
     const effectiveFromName = fromName || defaultFromName;
 
-    log("From:", effectiveFromEmail);
-    log("From Name:", effectiveFromName || "(none)");
+    log("Effective From:", effectiveFromEmail);
+    log("Effective From Name:", effectiveFromName || "(none)");
 
     // Format the "from" field for database storage
     // Store as "Name <email>" if name is available, otherwise just "email"
@@ -183,30 +206,21 @@ export async function POST(request: NextRequest) {
       log("Placeholders replaced in subject and body");
     }
 
-    // Fetch and replace global variables from system settings
-    try {
-      const systemSettings = await adminDb.query({
-        system_settings: {},
+    // Replace global variables from system settings (already fetched above)
+    const globalVariables = systemSettingsData?.globalVariables || [];
+
+    if (Array.isArray(globalVariables) && globalVariables.length > 0) {
+      log(`Found ${globalVariables.length} global variables`);
+
+      // Replace global variables in subject and body
+      globalVariables.forEach((variable: { name: string; value: string }) => {
+        const placeholder = `{{${variable.name}}}`;
+        processedSubject = processedSubject.replace(new RegExp(placeholder, 'g'), variable.value);
+        processedBody = processedBody.replace(new RegExp(placeholder, 'g'), variable.value);
+        log(`  Replaced ${placeholder} with ${variable.value}`);
       });
 
-      const settings = systemSettings?.system_settings?.[0];
-      const globalVariables = settings?.globalVariables || [];
-
-      if (Array.isArray(globalVariables) && globalVariables.length > 0) {
-        log(`Found ${globalVariables.length} global variables`);
-
-        // Replace global variables in subject and body
-        globalVariables.forEach((variable: { name: string; value: string }) => {
-          const placeholder = `{{${variable.name}}}`;
-          processedSubject = processedSubject.replace(new RegExp(placeholder, 'g'), variable.value);
-          processedBody = processedBody.replace(new RegExp(placeholder, 'g'), variable.value);
-          log(`  Replaced ${placeholder} with ${variable.value}`);
-        });
-
-        log("Global variables replaced in subject and body");
-      }
-    } catch (error) {
-      log("Error fetching global variables (continuing without them):", error);
+      log("Global variables replaced in subject and body");
     }
 
     // Generate unique email ID for tracking

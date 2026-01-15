@@ -144,6 +144,14 @@ const schema = i.schema({
       defaultFromName: i.string().optional(), // Default sender display name
       globalVariables: i.json().optional(), // Global variables for email templates [{name, value}]
     }),
+
+    // Field definitions namespace - n8n field mappings
+    field_definitions: i.entity({
+      name: i.string(), // Field name from n8n form (technical key)
+      label: i.string(), // Display label (human-readable)
+      type: i.string(), // "text", "number", "date", "select", "file"
+      position: i.number().indexed(), // Display order, indexed for sorting
+    }),
   },
   links: {
     // Link stages to pipes

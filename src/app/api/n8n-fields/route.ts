@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-
-const FIELDS_FILE = "/home/vibecode/workspace/data/n8n-field-definitions.json";
+import { adminDb } from "@/lib/db-admin";
+import { id } from "@instantdb/admin";
 
 /**
- * GET - Retrieve field definitions
- * POST - Save field definitions
+ * GET - Retrieve field definitions from database
+ * POST - Save field definitions to database
  */
 
 export async function GET() {
   try {
-    if (!existsSync(FIELDS_FILE)) {
-      return NextResponse.json({ fields: [] });
-    }
+    // Query all field definitions from database
+    const result = await adminDb.query({
+      field_definitions: {},
+    });
 
-    const content = await readFile(FIELDS_FILE, "utf-8");
-    const fields = JSON.parse(content);
+    const fieldDefs = result?.field_definitions || [];
+
+    // Sort by position and return
+    const fields = fieldDefs
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((field: any) => ({
+        name: field.name,
+        label: field.label,
+        type: field.type,
+        position: field.position,
+      }));
 
     return NextResponse.json({ fields });
   } catch (error: any) {
@@ -36,13 +44,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure data directory exists
-    const dataDir = "/home/vibecode/workspace/data";
-    if (!existsSync(dataDir)) {
-      await mkdir(dataDir, { recursive: true });
+    // First, get all existing field definitions to delete them
+    const existingResult = await adminDb.query({
+      field_definitions: {},
+    });
+
+    const existingFields = existingResult?.field_definitions || [];
+
+    // Build transaction: delete all existing, create new ones
+    const txs = [];
+
+    // Delete all existing field definitions
+    for (const field of existingFields) {
+      txs.push(adminDb.tx.field_definitions[field.id].delete());
     }
 
-    await writeFile(FIELDS_FILE, JSON.stringify(fields, null, 2));
+    // Create new field definitions
+    for (const field of fields) {
+      const fieldId = id();
+      txs.push(
+        adminDb.tx.field_definitions[fieldId].update({
+          name: field.name,
+          label: field.label,
+          type: field.type,
+          position: field.position,
+        })
+      );
+    }
+
+    // Execute transaction
+    await adminDb.transact(txs);
 
     return NextResponse.json({
       success: true,

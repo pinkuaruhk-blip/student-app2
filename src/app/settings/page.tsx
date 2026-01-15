@@ -36,13 +36,6 @@ export default function SettingsPage() {
   const [currentLanguage, setCurrentLanguage] = useState<string>("en");
   const [languageChanged, setLanguageChanged] = useState(false);
 
-  // Custom fields state
-  const [customFields, setCustomFields] = useState<Array<{ name: string; label: string }>>([]);
-  const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldLabel, setNewFieldLabel] = useState("");
-  const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
-  const [fieldsSaved, setFieldsSaved] = useState(false);
-
   // Global variables state
   const [globalVariables, setGlobalVariables] = useState<Array<{ name: string; value: string }>>([]);
   const [newVarName, setNewVarName] = useState("");
@@ -74,18 +67,6 @@ export default function SettingsPage() {
       }
     }
   }, [systemSettings]);
-
-  // Load custom fields on mount
-  useEffect(() => {
-    fetch("/api/n8n-fields")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.fields && Array.isArray(data.fields)) {
-          setCustomFields(data.fields);
-        }
-      })
-      .catch((err) => console.error("Failed to load custom fields:", err));
-  }, []);
 
   // Load current language from cookie
   useEffect(() => {
@@ -172,96 +153,6 @@ export default function SettingsPage() {
       console.error("❌ Error saving email settings:", error);
       alert("Failed to save settings: " + (error as Error).message);
     }
-  };
-
-  // Custom fields handlers
-  const handleAddOrUpdateField = async () => {
-    const fieldName = newFieldName.trim();
-    const fieldLabel = newFieldLabel.trim();
-
-    if (!fieldName || !fieldLabel) {
-      alert("Both field name and label are required");
-      return;
-    }
-
-    // Validate field name (no spaces, lowercase, alphanumeric + underscore)
-    if (!/^[a-z0-9_]+$/.test(fieldName)) {
-      alert("Field name must be lowercase letters, numbers, and underscores only (no spaces)");
-      return;
-    }
-
-    const updatedFields = [...customFields];
-
-    if (editingFieldIndex !== null) {
-      // Update existing field
-      updatedFields[editingFieldIndex] = { name: fieldName, label: fieldLabel };
-      setEditingFieldIndex(null);
-    } else {
-      // Check if field name already exists
-      if (customFields.some((f) => f.name === fieldName)) {
-        alert("A field with this name already exists");
-        return;
-      }
-      // Add new field
-      updatedFields.push({ name: fieldName, label: fieldLabel });
-    }
-
-    try {
-      const response = await fetch("/api/n8n-fields", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: updatedFields }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save fields");
-      }
-
-      setCustomFields(updatedFields);
-      setNewFieldName("");
-      setNewFieldLabel("");
-      setFieldsSaved(true);
-      setTimeout(() => setFieldsSaved(false), 3000);
-    } catch (error) {
-      console.error("Failed to save field:", error);
-      alert("Failed to save field: " + (error as Error).message);
-    }
-  };
-
-  const handleEditField = (index: number) => {
-    const field = customFields[index];
-    setNewFieldName(field.name);
-    setNewFieldLabel(field.label);
-    setEditingFieldIndex(index);
-  };
-
-  const handleDeleteField = async (index: number) => {
-    if (!confirm("Are you sure you want to delete this field definition?")) return;
-
-    const updatedFields = customFields.filter((_, i) => i !== index);
-
-    try {
-      const response = await fetch("/api/n8n-fields", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: updatedFields }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete field");
-      }
-
-      setCustomFields(updatedFields);
-    } catch (error) {
-      console.error("Failed to delete field:", error);
-      alert("Failed to delete field: " + (error as Error).message);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setNewFieldName("");
-    setNewFieldLabel("");
-    setEditingFieldIndex(null);
   };
 
   // Global variables handlers
@@ -601,129 +492,6 @@ export default function SettingsPage() {
                   {emailSettingsSaved && (
                     <span className="text-green-600 text-sm font-medium">
                       ✓ Settings saved successfully!
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Custom Field Definitions */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">📝 Custom Field Definitions</h2>
-              <p className="text-sm text-gray-600 mb-6">
-                Define custom fields that can be used in email templates and form pre-fill.
-                Use <code className="bg-gray-100 px-1 rounded text-xs">{`{{card.field.FIELD_NAME}}`}</code> in templates.
-              </p>
-
-              {/* Fields Table */}
-              {customFields.length > 0 && (
-                <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Field Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Field Label
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Usage
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {customFields.map((field, index) => (
-                        <tr key={index} className={editingFieldIndex === index ? "bg-blue-50" : ""}>
-                          <td className="px-4 py-3 text-sm font-mono text-gray-900">
-                            {field.name}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {field.label}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-500 font-mono">
-                            {`{{card.field.${field.name}}}`}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right space-x-2">
-                            <button
-                              onClick={() => handleEditField(index)}
-                              className="text-blue-600 hover:text-blue-800"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteField(index)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Add/Edit Field Form */}
-              <div className="border-t pt-6">
-                <h3 className="text-base font-medium text-gray-900 mb-4">
-                  {editingFieldIndex !== null ? "Edit Field" : "Add New Field"}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Field Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={newFieldName}
-                      onChange={(e) => setNewFieldName(e.target.value.toLowerCase())}
-                      placeholder="e.g., customer_email"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
-                      disabled={editingFieldIndex !== null}
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Lowercase, no spaces (use underscores)
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Field Label <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={newFieldLabel}
-                      onChange={(e) => setNewFieldLabel(e.target.value)}
-                      placeholder="e.g., Customer Email"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Human-readable display name
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 mt-4">
-                  <button
-                    onClick={handleAddOrUpdateField}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    {editingFieldIndex !== null ? "Update Field" : "Add Field"}
-                  </button>
-                  {editingFieldIndex !== null && (
-                    <button
-                      onClick={handleCancelEdit}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  {fieldsSaved && (
-                    <span className="text-green-600 text-sm font-medium">
-                      ✓ Field saved successfully!
                     </span>
                   )}
                 </div>

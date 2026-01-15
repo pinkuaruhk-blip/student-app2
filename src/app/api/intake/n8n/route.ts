@@ -17,19 +17,32 @@ const db = init({
 });
 
 /**
- * Load fixed field definitions from settings
+ * Load fixed field definitions from database
  */
-async function loadFieldDefinitions(): Promise<Array<{ name: string; type: string; position: number }>> {
+async function loadFieldDefinitions(): Promise<Array<{ name: string; label: string; type: string; position: number }>> {
   try {
-    const fs = await import('fs/promises');
-    const fieldsPath = '/home/vibecode/workspace/data/n8n-field-definitions.json';
-    const content = await fs.readFile(fieldsPath, 'utf-8');
-    const fields = JSON.parse(content);
+    // Query field definitions from database
+    const result = await db.query({
+      field_definitions: {},
+    });
 
-    console.log("📋 Loaded fixed field definitions:", fields.length, "fields");
-    return fields.sort((a: any, b: any) => a.position - b.position);
+    const fieldDefs = result?.field_definitions || [];
+
+    // Sort by position
+    const fields = fieldDefs
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((field: any) => ({
+        name: field.name,
+        label: field.label,
+        type: field.type,
+        position: field.position,
+      }));
+
+    console.log("📋 Loaded fixed field definitions from database:", fields.length, "fields");
+    return fields;
   } catch (error: any) {
-    console.log("ℹ️  No fixed field definitions found - using dynamic fields");
+    console.log("ℹ️  No fixed field definitions found in database");
+    console.error("Error loading field definitions:", error);
     return [];
   }
 }

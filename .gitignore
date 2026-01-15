@@ -5,3 +5,5 @@
 
 # Claude / AI history
 .dotclaude/
+STACK.md
+node_modules/

@@ -66,5 +66,13 @@
   {
     "fieldName": "後備名單排名",
     "showOnCard": true
+  },
+  {
+    "fieldName": "test",
+    "showOnCard": false
+  },
+  {
+    "fieldName": "學校全名",
+    "showOnCard": false
   }
 ]
