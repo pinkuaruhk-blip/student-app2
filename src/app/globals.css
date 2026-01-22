@@ -95,7 +95,7 @@ body {
   margin: 0.5em 0;
 }
 
-/* Fix Chrome autofill light grey text on mobile */
+/* Fix Chrome autofill light grey text on mobile - Aggressive override */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -108,10 +108,16 @@ select:-webkit-autofill,
 select:-webkit-autofill:hover,
 select:-webkit-autofill:focus,
 select:-webkit-autofill:active {
-  -webkit-text-fill-color: #111827 !important;
+  /* Force dark text color - this overrides Chrome's light grey */
+  -webkit-text-fill-color: #000000 !important;
+  color: #000000 !important;
+  /* Force white background to replace light blue */
   -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
   box-shadow: 0 0 0px 1000px #ffffff inset !important;
-  transition: background-color 5000s ease-in-out 0s;
+  background-color: #ffffff !important;
+  /* Prevent Chrome from reverting the styles */
+  transition: background-color 5000s ease-in-out 0s, color 5000s ease-in-out 0s;
+  transition-delay: 5000s;
 }
 
 /* Additional override for all input states to ensure dark text */
@@ -119,4 +125,60 @@ input,
 textarea,
 select {
   color: #111827 !important;
+  /* Ensure proper rendering on mobile */
+  -webkit-text-fill-color: #111827 !important;
+}
+
+/* Fix light blue info boxes - ensure readable text on mobile Chrome */
+.bg-blue-50 {
+  /* Ensure text is dark and readable on light blue backgrounds */
+  --tw-text-opacity: 1 !important;
+}
+
+/* Override light text colors in blue backgrounds for mobile readability */
+.bg-blue-50 .text-blue-700,
+.bg-blue-50 .text-blue-800,
+.bg-blue-50 .text-blue-900,
+.bg-blue-50 .text-gray-600,
+.bg-blue-50 .text-gray-700,
+.bg-blue-50 code {
+  color: #1e3a8a !important;
+  -webkit-text-fill-color: #1e3a8a !important;
+}
+
+/* Ensure code blocks in blue backgrounds are readable */
+.bg-blue-100 {
+  color: #1e3a8a !important;
+  -webkit-text-fill-color: #1e3a8a !important;
+}
+
+/* Ensure prose content has dark text */
+.prose {
+  color: #111827;
+}
+
+.prose * {
+  color: #111827;
+}
+
+/* Fix other colored info boxes for mobile readability */
+.bg-green-50 .text-green-700,
+.bg-green-50 .text-green-800,
+.bg-green-50 .text-green-900 {
+  color: #166534 !important;
+  -webkit-text-fill-color: #166534 !important;
+}
+
+.bg-yellow-50 .text-yellow-700,
+.bg-yellow-50 .text-yellow-800,
+.bg-yellow-50 .text-yellow-900 {
+  color: #854d0e !important;
+  -webkit-text-fill-color: #854d0e !important;
+}
+
+.bg-red-50 .text-red-700,
+.bg-red-50 .text-red-800,
+.bg-red-50 .text-red-900 {
+  color: #991b1b !important;
+  -webkit-text-fill-color: #991b1b !important;
 }

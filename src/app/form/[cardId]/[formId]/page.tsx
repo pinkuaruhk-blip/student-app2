@@ -697,7 +697,7 @@ export default function PublicFormPage({ params }: PageProps) {
 
                 {field.type === "content" && (
                   <div
-                    className="prose prose-sm max-w-none bg-blue-50 border border-blue-200 rounded-lg p-4"
+                    className="prose prose-sm max-w-none bg-blue-50 border border-blue-200 rounded-lg p-4 [&_*]:!text-gray-900"
                     dangerouslySetInnerHTML={{
                       __html: replacePlaceholders(field.content || "", {
                         card: {
