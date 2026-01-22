@@ -278,7 +278,7 @@ function TemplateEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Welcome Email, Form Request"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
 
@@ -292,7 +292,7 @@ function TemplateEditor({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g., Send this when client needs to fill out contact form"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
 
@@ -306,7 +306,7 @@ function TemplateEditor({
               value={fromEmail}
               onChange={(e) => setFromEmail(e.target.value)}
               placeholder="e.g., noreply@example.com (leave blank for default)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
               Used as reply-to address. Leave blank to use system default.
@@ -323,7 +323,7 @@ function TemplateEditor({
               value={fromName}
               onChange={(e) => setFromName(e.target.value)}
               placeholder="e.g., Support Team (leave blank for default)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
               Display name shown with the email address. Leave blank to use system default.
@@ -340,7 +340,7 @@ function TemplateEditor({
               value={toEmail}
               onChange={(e) => setToEmail(e.target.value)}
               placeholder="e.g., recipient@example.com (leave blank to use card field)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
               Override recipient email. Leave blank to use the email field from automation config.
@@ -357,7 +357,7 @@ function TemplateEditor({
               value={cc}
               onChange={(e) => setCc(e.target.value)}
               placeholder="e.g., team@example.com (comma-separated for multiple)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
               Carbon copy recipients. Separate multiple emails with commas.
@@ -374,7 +374,7 @@ function TemplateEditor({
               value={bcc}
               onChange={(e) => setBcc(e.target.value)}
               placeholder="e.g., admin@example.com (leave blank for no BCC)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
               Blind carbon copy recipient. Leave blank to not send BCC.
@@ -419,7 +419,7 @@ function TemplateEditor({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., Action Required: Please fill out {{form.name}}"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <div className="mt-2 flex flex-wrap gap-2">
               {placeholders.slice(0, 4).map((p) => (
@@ -461,7 +461,7 @@ function TemplateEditor({
           {/* Preview */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
-            <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+            <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 text-gray-900">
               <div className="text-sm font-medium text-gray-700 mb-2">
                 Subject: {subject || "(empty)"}
               </div>

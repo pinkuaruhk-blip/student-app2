@@ -154,7 +154,7 @@ export default function FormbricksSettingsPage() {
                     value={newFieldId}
                     onChange={(e) => setNewFieldId(e.target.value)}
                     placeholder="e.g., avw3gfgpdit99d8e9d1qe8yg"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                   />
                 </div>
                 <div>
@@ -166,7 +166,7 @@ export default function FormbricksSettingsPage() {
                     value={newFieldLabel}
                     onChange={(e) => setNewFieldLabel(e.target.value)}
                     placeholder="e.g., 商店名稱 or Store Name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                   />
                 </div>
               </div>

@@ -334,7 +334,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="e.g., Client Information Form"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
             </div>
             <div>
@@ -344,7 +344,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as "client" | "admin")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
                 <option value="client">Client Form (Send link to client)</option>
                 <option value="admin">Admin Form (Fill within card)</option>
@@ -446,7 +446,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                     value={fieldName}
                     onChange={(e) => setFieldName(e.target.value)}
                     placeholder="e.g., company_name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 </div>
               )}
@@ -459,7 +459,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                   value={fieldLabel}
                   onChange={(e) => setFieldLabel(e.target.value)}
                   placeholder={fieldType === "content" ? "e.g., Important Information" : "e.g., Company Name"}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
               </div>
               <div className="col-span-2">
@@ -471,7 +471,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                   onChange={(e) => setFieldDescription(e.target.value)}
                   placeholder="e.g., Enter your company's legal name as it appears on official documents"
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   This help text will appear below the field. Supports HTML for links: <code className="bg-gray-100 px-1 rounded">&lt;a href="URL" target="_blank"&gt;Link text&lt;/a&gt;</code>
@@ -484,7 +484,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                 <select
                   value={fieldType}
                   onChange={(e) => setFieldType(e.target.value as FormField["type"])}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 >
                   <option value="text">Text</option>
                   <option value="email">Email</option>
@@ -521,7 +521,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                     value={fieldOptions}
                     onChange={(e) => setFieldOptions(e.target.value)}
                     placeholder="e.g., Option 1, Option 2, Option 3"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 </div>
               )}
@@ -535,7 +535,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                     value={fieldAcceptedFileTypes}
                     onChange={(e) => setFieldAcceptedFileTypes(e.target.value)}
                     placeholder="e.g., .pdf,.jpg,.png or image/*,application/pdf"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                   <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-xs font-semibold text-yellow-900 mb-2">💡 File Type Examples:</p>
@@ -699,7 +699,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                       <select
                         value={conditionLogic}
                         onChange={(e) => setConditionLogic(e.target.value as "AND" | "OR")}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       >
                         <option value="AND">AND (all conditions must be true)</option>
                         <option value="OR">OR (any condition can be true)</option>
@@ -725,7 +725,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                                 onChange={(e) =>
                                   handleUpdateConditionRule(rule.id, { fieldName: e.target.value })
                                 }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                               >
                                 <option value="">Select field...</option>
                                 {fields
@@ -750,7 +750,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                                     operator: e.target.value as FieldCondition["operator"],
                                   })
                                 }
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                               >
                                 <option value="equals">equals</option>
                                 <option value="notEquals">not equals</option>
@@ -780,7 +780,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                                     handleUpdateConditionRule(rule.id, { value: e.target.value })
                                   }
                                   placeholder="Enter value..."
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                                 />
                               )}
                             </div>
@@ -862,7 +862,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                             setPrefillFormId(e.target.value);
                             setPrefillFieldName(""); // Reset field when form changes
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-900"
                         >
                           <option value="">Select a form...</option>
                           {allFormsInPipe.map((form: any) => (
@@ -882,7 +882,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
                           value={prefillFieldName}
                           onChange={(e) => setPrefillFieldName(e.target.value)}
                           disabled={!prefillFormId}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-gray-100 disabled:text-gray-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white disabled:bg-gray-100 disabled:text-gray-500 text-gray-900"
                         >
                           <option value="">Select a field...</option>
                           {prefillFormId &&

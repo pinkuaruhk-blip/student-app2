@@ -385,7 +385,7 @@ function AutomationRuleBuilder({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Send welcome form when card is created"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
 
@@ -403,7 +403,7 @@ function AutomationRuleBuilder({
                     setTriggerType(e.target.value);
                     setTriggerConfig({});
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 >
                   <option value="form_submission">Form is submitted</option>
                   <option value="card_enters_stage">Card enters a stage</option>
@@ -427,7 +427,7 @@ function AutomationRuleBuilder({
                         formName: selectedForm?.name || "",
                       });
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   >
                     <option value="">Select a form...</option>
                     {forms.map((form: any) => (
@@ -451,7 +451,7 @@ function AutomationRuleBuilder({
                         stageId: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   >
                     <option value="">Select a stage...</option>
                     {stages.map((stage: any) => (
@@ -474,7 +474,7 @@ function AutomationRuleBuilder({
                       onChange={(e) =>
                         setTriggerConfig({ ...triggerConfig, fieldKey: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     >
                       <option value="">Select a field...</option>
                       {n8nFields.map((field) => (
@@ -492,7 +492,7 @@ function AutomationRuleBuilder({
                           setTriggerConfig({ ...triggerConfig, fieldKey: e.target.value })
                         }
                         placeholder="e.g., custom_field"
-                        className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48"
+                        className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48 text-gray-900"
                       />
                     </p>
                   </div>
@@ -506,7 +506,7 @@ function AutomationRuleBuilder({
                         onChange={(e) =>
                           setTriggerConfig({ ...triggerConfig, operator: e.target.value })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       >
                         <option value="equals">equals</option>
                         <option value="not_equals">not equals</option>
@@ -524,7 +524,7 @@ function AutomationRuleBuilder({
                           setTriggerConfig({ ...triggerConfig, value: e.target.value })
                         }
                         placeholder="e.g., approved"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       />
                     </div>
                   </div>
@@ -560,7 +560,7 @@ function AutomationRuleBuilder({
                   <select
                     value={conditions.logic}
                     onChange={(e) => setConditions({ ...conditions, logic: e.target.value })}
-                    className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                   >
                     <option value="AND">ALL</option>
                     <option value="OR">ANY</option>
@@ -591,7 +591,7 @@ function AutomationRuleBuilder({
                           onChange={(e) =>
                             handleUpdateCondition(condition.id, "fieldKey", e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                         >
                           <option value="">Select a field...</option>
 
@@ -631,7 +631,7 @@ function AutomationRuleBuilder({
                               handleUpdateCondition(condition.id, "fieldKey", e.target.value)
                             }
                             placeholder="e.g., custom_field"
-                            className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-32"
+                            className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-32 text-gray-900"
                           />
                         </p>
                         <p className="text-xs text-blue-600 mt-1">
@@ -647,7 +647,7 @@ function AutomationRuleBuilder({
                           onChange={(e) =>
                             handleUpdateCondition(condition.id, "operator", e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                         >
                           <option value="equals">equals</option>
                           <option value="not_equals">not equals</option>
@@ -676,7 +676,7 @@ function AutomationRuleBuilder({
                           disabled={
                             condition.operator === "is_filled" || condition.operator === "is_empty"
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 text-gray-900"
                         />
                       </div>
                     </div>
@@ -726,7 +726,7 @@ function AutomationRuleBuilder({
                         <select
                           value={action.type}
                           onChange={(e) => handleUpdateAction(index, "type", e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                         >
                           <option value="move_card">Move card to stage</option>
                           <option value="send_form_link">Send form link</option>
@@ -746,7 +746,7 @@ function AutomationRuleBuilder({
                             onChange={(e) =>
                               handleUpdateAction(index, "targetStageId", e.target.value)
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                           >
                             <option value="">Select a stage...</option>
                             {stages.map((stage: any) => (
@@ -769,7 +769,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "formId", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Select a form...</option>
                               {forms.map((form: any) => (
@@ -788,7 +788,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "templateId", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Use default template</option>
                               {templates.map((template: any) => (
@@ -810,7 +810,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "recipientField", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Select a field...</option>
                               {n8nFields.map((field) => (
@@ -828,7 +828,7 @@ function AutomationRuleBuilder({
                                   handleUpdateAction(index, "recipientField", e.target.value)
                                 }
                                 placeholder="e.g., email"
-                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48"
+                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48 text-gray-900"
                               />
                             </p>
                           </div>
@@ -846,7 +846,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "templateId", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Select a template...</option>
                               {templates.map((template: any) => (
@@ -870,7 +870,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "formId", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">No form link</option>
                               {forms.map((form: any) => (
@@ -892,7 +892,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "recipientField", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Select a field...</option>
                               {n8nFields.map((field) => (
@@ -910,7 +910,7 @@ function AutomationRuleBuilder({
                                   handleUpdateAction(index, "recipientField", e.target.value)
                                 }
                                 placeholder="e.g., email"
-                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48"
+                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48 text-gray-900"
                               />
                             </p>
                           </div>
@@ -928,7 +928,7 @@ function AutomationRuleBuilder({
                               onChange={(e) =>
                                 handleUpdateAction(index, "fieldKey", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">Select a field...</option>
                               {n8nFields.map((field) => (
@@ -946,7 +946,7 @@ function AutomationRuleBuilder({
                                   handleUpdateAction(index, "fieldKey", e.target.value)
                                 }
                                 placeholder="e.g., custom_field"
-                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48"
+                                className="ml-2 px-2 py-1 border border-gray-300 rounded text-xs w-48 text-gray-900"
                               />
                             </p>
                           </div>
@@ -961,7 +961,7 @@ function AutomationRuleBuilder({
                                 handleUpdateAction(index, "value", e.target.value)
                               }
                               placeholder="e.g., approved"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             />
                           </div>
                         </div>

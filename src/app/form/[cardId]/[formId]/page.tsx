@@ -553,7 +553,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -563,7 +563,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -573,7 +573,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -583,7 +583,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -593,7 +593,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -603,7 +603,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
 
@@ -612,7 +612,7 @@ export default function PublicFormPage({ params }: PageProps) {
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     required={field.required}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   >
                     <option value="">選擇選項... (Select an option...)</option>
                     {field.options?.map((option) => (

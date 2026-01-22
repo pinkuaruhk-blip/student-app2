@@ -247,7 +247,7 @@ export default function PipesPage() {
                       value={newPipeName}
                       onChange={(e) => setNewPipeName(e.target.value)}
                       placeholder="e.g., Sales Pipeline, Support Tickets"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                       autoFocus
                     />
                   </div>
@@ -369,7 +369,7 @@ export default function PipesPage() {
                     value={renamePipeName}
                     onChange={(e) => setRenamePipeName(e.target.value)}
                     placeholder="Enter pipe name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 text-gray-900"
                     autoFocus
                   />
                   <div className="flex gap-3 justify-end">

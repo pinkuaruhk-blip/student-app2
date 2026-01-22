@@ -457,7 +457,7 @@ export default function SettingsPage() {
                     value={defaultFromEmail}
                     onChange={(e) => setDefaultFromEmail(e.target.value)}
                     placeholder="e.g., noreply@yourdomain.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     The default email address that will appear in the "From" field
@@ -474,7 +474,7 @@ export default function SettingsPage() {
                     value={defaultFromName}
                     onChange={(e) => setDefaultFromName(e.target.value)}
                     placeholder="e.g., Your Company Name"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                   />
                   <p className="mt-1 text-xs text-gray-500">
                     The display name that will appear with the email address (e.g., "Support Team &lt;support@example.com&gt;")
@@ -574,7 +574,7 @@ export default function SettingsPage() {
                       value={newVarName}
                       onChange={(e) => setNewVarName(e.target.value.toLowerCase())}
                       placeholder="e.g., year"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono text-sm text-gray-900"
                       disabled={editingVarIndex !== null}
                     />
                     <p className="mt-1 text-xs text-gray-500">
@@ -590,7 +590,7 @@ export default function SettingsPage() {
                       value={newVarValue}
                       onChange={(e) => setNewVarValue(e.target.value)}
                       placeholder="e.g., 2025-26"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                     />
                     <p className="mt-1 text-xs text-gray-500">
                       The value to replace in templates
@@ -643,7 +643,7 @@ export default function SettingsPage() {
                 <select
                   value={selectedPipeId || ""}
                   onChange={(e) => setSelectedPipeId(e.target.value || null)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                 >
                   <option value="">-- Select a pipe --</option>
                   {pipes.map((pipe: any) => (
@@ -740,7 +740,7 @@ export default function SettingsPage() {
                           }
                         }}
                         placeholder="Stage name..."
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                       />
                       <button
                         onClick={handleAddStage}

@@ -918,7 +918,7 @@ export default function KanbanPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={t('searchCards')}
-                        className="pl-9 pr-9 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                        className="pl-9 pr-9 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 text-gray-900"
                       />
                       <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1152,7 +1152,7 @@ export default function KanbanPage() {
                     </div>
 
                     {/* Fixed Divider Line */}
-                    <div className="border-t border-gray-300 mb-3"></div>
+                    <div className="border-t border-gray-300 mb-3 text-gray-900"></div>
 
                     {/* Drop Zone */}
                     <div
@@ -1310,7 +1310,7 @@ export default function KanbanPage() {
                             }
                           }}
                           placeholder="Card title..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
                           autoFocus
                         />
                         <div className="flex gap-2">
@@ -1422,7 +1422,7 @@ export default function KanbanPage() {
                         setIsStageDropdownOpen(!isStageDropdownOpen);
                         setTempSelectedInboxStages(selectedInboxStages);
                       }}
-                      className="w-full px-2 py-1.5 text-left border border-gray-300 rounded-lg text-xs hover:bg-gray-50 flex items-center justify-between"
+                      className="w-full px-2 py-1.5 text-left border border-gray-300 rounded-lg text-xs hover:bg-gray-50 flex items-center justify-between text-gray-900"
                     >
                       <span className="text-gray-700">
                         {selectedInboxStages.length === 0
@@ -1433,7 +1433,7 @@ export default function KanbanPage() {
                     </button>
 
                     {isStageDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 text-gray-900">
                         <div className="p-1.5 max-h-48 overflow-y-auto">
                           {stages.map((stage: any) => (
                             <label
@@ -1452,7 +1452,7 @@ export default function KanbanPage() {
                                     );
                                   }
                                 }}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5 text-gray-900"
                               />
                               <span className="text-xs text-gray-700">{stage.name}</span>
                             </label>
@@ -1573,7 +1573,7 @@ export default function KanbanPage() {
                       <>
                         {/* Inline Email Compose Box */}
                         {emailComposeView === 'inline' && (
-                          <div ref={composeEmailRef} className="border border-gray-300 rounded-lg p-3 mb-4 bg-white shadow-sm">
+                          <div ref={composeEmailRef} className="border border-gray-300 rounded-lg p-3 mb-4 bg-white shadow-sm text-gray-900">
                             <div className="flex justify-between items-center mb-2">
                               <h3 className="text-sm font-semibold text-gray-900">Compose Email</h3>
                               <button
@@ -1596,7 +1596,7 @@ export default function KanbanPage() {
                             type="text"
                             value={emailTo}
                             onChange={(e) => setEmailTo(e.target.value)}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             placeholder="recipient@example.com"
                           />
                           {/* Cc/Bcc Toggle Buttons */}
@@ -1648,7 +1648,7 @@ export default function KanbanPage() {
                             <select
                               value={selectedTemplate}
                               onChange={(e) => handleSelectTemplate(e.target.value)}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             >
                               <option value="">-- Select a template --</option>
                               {emailTemplates.map((template: any) => (
@@ -1670,7 +1670,7 @@ export default function KanbanPage() {
                               type="text"
                               value={emailCc}
                               onChange={(e) => setEmailCc(e.target.value)}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                               placeholder="cc@example.com (comma-separated for multiple)"
                             />
                           </div>
@@ -1686,7 +1686,7 @@ export default function KanbanPage() {
                               type="text"
                               value={emailBcc}
                               onChange={(e) => setEmailBcc(e.target.value)}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                               placeholder="bcc@example.com (comma-separated for multiple)"
                             />
                           </div>
@@ -1701,7 +1701,7 @@ export default function KanbanPage() {
                             type="text"
                             value={emailSubject}
                             onChange={(e) => setEmailSubject(e.target.value)}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                             placeholder="Email subject"
                           />
                         </div>
@@ -1759,7 +1759,7 @@ export default function KanbanPage() {
                             style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
                           >
                             <div className="mx-4" style={{ width: '1000px', height: '800px' }}>
-                              <div className="border border-gray-300 rounded-lg p-4 bg-white shadow-2xl h-full overflow-y-auto">
+                              <div className="border border-gray-300 rounded-lg p-4 bg-white shadow-2xl h-full overflow-y-auto text-gray-900">
                                 <div className="flex justify-between items-center mb-2">
                                   <h3 className="text-sm font-semibold text-gray-900">Compose Email</h3>
                                   <button
@@ -1782,7 +1782,7 @@ export default function KanbanPage() {
                                     type="text"
                                     value={emailTo}
                                     onChange={(e) => setEmailTo(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                                     placeholder="recipient@example.com"
                                   />
                                   {/* Cc/Bcc Toggle Buttons */}
@@ -1834,7 +1834,7 @@ export default function KanbanPage() {
                                     <select
                                       value={selectedTemplate}
                                       onChange={(e) => handleSelectTemplate(e.target.value)}
-                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                                     >
                                       <option value="">-- Select a template --</option>
                                       {emailTemplates.map((template: any) => (
@@ -1856,7 +1856,7 @@ export default function KanbanPage() {
                                       type="text"
                                       value={emailCc}
                                       onChange={(e) => setEmailCc(e.target.value)}
-                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                                       placeholder="cc@example.com (comma-separated for multiple)"
                                     />
                                   </div>
@@ -1872,7 +1872,7 @@ export default function KanbanPage() {
                                       type="text"
                                       value={emailBcc}
                                       onChange={(e) => setEmailBcc(e.target.value)}
-                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                      className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                                       placeholder="bcc@example.com (comma-separated for multiple)"
                                     />
                                   </div>
@@ -1887,7 +1887,7 @@ export default function KanbanPage() {
                                     type="text"
                                     value={emailSubject}
                                     onChange={(e) => setEmailSubject(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                                     placeholder="Email subject"
                                   />
                                 </div>
@@ -2002,7 +2002,7 @@ export default function KanbanPage() {
                                     </svg>
                                   </button>
                                   {openEmailMenuId === email.id && (
-                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 py-1 w-40">
+                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 py-1 w-40 text-gray-900">
                                       {emailToConfirmDelete === email.id ? (
                                         // Confirmation UI
                                         <div className="px-3 py-2">
@@ -2013,7 +2013,7 @@ export default function KanbanPage() {
                                                 e.stopPropagation();
                                                 setEmailToConfirmDelete(null);
                                               }}
-                                              className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                                              className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-900"
                                             >
                                               Cancel
                                             </button>
@@ -2090,7 +2090,7 @@ export default function KanbanPage() {
                                       }, 100);
                                     }, 100);
                                   }}
-                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-900"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -2115,7 +2115,7 @@ export default function KanbanPage() {
                                       }, 100);
                                     }, 100);
                                   }}
-                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-900"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -2139,7 +2139,7 @@ export default function KanbanPage() {
                                       }, 100);
                                     }, 100);
                                   }}
-                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-900"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -2213,7 +2213,7 @@ export default function KanbanPage() {
                         placeholder="Type your comment here"
                         rows={4}
                         disabled={savingComment}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900"
                       />
                       {commentText.trim().length > 0 && (
                         <button

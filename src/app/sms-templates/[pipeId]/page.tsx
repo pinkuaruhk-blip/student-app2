@@ -259,7 +259,7 @@ function TemplateEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Appointment Reminder, Follow-up Message"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
 
@@ -273,7 +273,7 @@ function TemplateEditor({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g., Send this when appointment is confirmed"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
 
@@ -316,7 +316,7 @@ function TemplateEditor({
               onChange={(e) => setBody(e.target.value)}
               placeholder="Type your SMS message here. Use placeholders like {{card.title}} to personalize."
               rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm text-gray-900"
             />
             <div className="flex justify-between items-center mt-2 text-sm">
               <span className="text-gray-600">
