@@ -57,6 +57,12 @@ export default function KanbanPage() {
   const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
   const [stageSortOrders, setStageSortOrders] = useState<Record<string, "newest" | "oldest">>({});
   const [openMenuStageId, setOpenMenuStageId] = useState<string | null>(null);
+
+  // Mouse drag scrolling state (when drag toggle is OFF)
+  const [isMouseDragging, setIsMouseDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showManageMenu, setShowManageMenu] = useState(false);
@@ -137,6 +143,33 @@ export default function KanbanPage() {
     const newValue = !isDraggingEnabled;
     setIsDraggingEnabled(newValue);
     localStorage.setItem("kanban-dragging-enabled", String(newValue));
+  };
+
+  // Mouse drag scrolling handlers (only active when drag toggle is OFF)
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDraggingEnabled || !scrollContainerRef.current) return;
+
+    // Don't drag if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    const isInteractive = target.closest('button, input, textarea, a, .card');
+
+    if (isInteractive) return;
+
+    setIsMouseDragging(true);
+    setDragStartX(e.clientX);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDragging || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.clientX;
+    const walk = (dragStartX - x) * 2; // Multiply for faster scrolling
+    scrollContainerRef.current.scrollLeft = scrollLeft + walk;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsMouseDragging(false);
   };
 
   // Handle sort order change
@@ -1025,7 +1058,16 @@ export default function KanbanPage() {
                 setHoveredStageId(null);
               }}
             >
-              <div className="flex gap-3 overflow-x-scroll h-[calc(100vh-140px)]">
+              <div
+                ref={scrollContainerRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+                className={`flex gap-3 overflow-x-scroll h-[calc(100vh-140px)] select-none ${
+                  !isDraggingEnabled ? (isMouseDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+                }`}
+              >
                 {stages.map((stage: any) => {
                   // Get sort order for this stage (default to "newest")
                   const sortOrder = stageSortOrders[stage.id] || "newest";
@@ -1049,7 +1091,7 @@ export default function KanbanPage() {
                   <div
                     key={stage.id}
                     id={stage.id}
-                    className="flex-shrink-0 w-64 rounded-lg p-3 h-full overflow-y-auto flex flex-col"
+                    className="stage-column flex-shrink-0 w-64 rounded-lg p-3 h-full overflow-y-auto flex flex-col"
                     style={{ backgroundColor: stage.backgroundColor || '#F3F4F6' }}
                   >
                     {/* Stage Header */}
@@ -1176,7 +1218,7 @@ export default function KanbanPage() {
                             }}
                             onDragEnd={() => setActiveId(null)}
                             onClick={() => setSelectedCard(card)}
-                            className={`bg-white rounded-lg p-3 shadow hover:shadow-md transition-shadow ${
+                            className={`card bg-white rounded-lg p-3 shadow hover:shadow-md transition-shadow ${
                               isDraggingEnabled ? "cursor-move" : "cursor-pointer"
                             }`}
                           >

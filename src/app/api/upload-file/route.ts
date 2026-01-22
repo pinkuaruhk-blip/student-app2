@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { put } from "@vercel/blob";
 import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -11,6 +10,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Missing fileName or fileData" },
         { status: 400 }
+      );
+    }
+
+    // Validate BLOB_READ_WRITE_TOKEN exists
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error("❌ BLOB_READ_WRITE_TOKEN not configured");
+      return NextResponse.json(
+        { error: "Blob storage not configured" },
+        { status: 500 }
       );
     }
 
@@ -28,25 +36,27 @@ export async function POST(request: NextRequest) {
     // Convert base64 to buffer
     const buffer = Buffer.from(base64Data, "base64");
 
-    // Save to public/uploads directory
-    const uploadsDir = join(process.cwd(), "public", "uploads");
-    const filePath = join(uploadsDir, uniqueFileName);
+    console.log(`📤 Uploading ${fileName} (${(buffer.length / 1024).toFixed(2)} KB) to Vercel Blob...`);
 
-    await writeFile(filePath, buffer);
+    // Upload to Vercel Blob Storage
+    const blob = await put(uniqueFileName, buffer, {
+      access: "public",
+      contentType: fileType || "application/octet-stream",
+      addRandomSuffix: false, // We already generated a unique filename
+    });
 
-    // Generate public URL
-    const publicUrl = `/uploads/${uniqueFileName}`;
+    console.log("✅ File uploaded successfully to Vercel Blob:", blob.url);
 
-    console.log("✅ File uploaded successfully:", publicUrl);
-
+    // Return response matching existing metadata structure
+    // CRITICAL: This maintains backward compatibility with existing code
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: blob.url, // Now returns full Vercel Blob URL (e.g., https://xxx.public.blob.vercel-storage.com/...)
       fileName: fileName,
       uniqueFileName: uniqueFileName,
     });
   } catch (error: any) {
-    console.error("❌ Error uploading file:", error);
+    console.error("❌ Error uploading file to Vercel Blob:", error);
     return NextResponse.json(
       {
         error: "Failed to upload file",

@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
         },
         automations: {}, // Pipe-level automations
         email_templates: {},
+        sms_templates: {},
       },
     });
 
@@ -251,8 +252,26 @@ export async function POST(req: NextRequest) {
             body: template.body,
             fromEmail: template.fromEmail,
             fromName: template.fromName,
+            toEmail: template.toEmail,
             cc: template.cc,
             bcc: template.bcc,
+            description: template.description,
+            createdAt: Date.now(),
+          })
+          .link({ pipe: newPipeId })
+      );
+    });
+
+    // 6. Create new SMS templates
+    const smsTemplates = sourcePipe.sms_templates || [];
+    smsTemplates.forEach((template: any) => {
+      const newTemplateId = generateId();
+      transactions.push(
+        db.tx.sms_templates[newTemplateId]
+          .update({
+            name: template.name,
+            body: template.body,
+            description: template.description,
             createdAt: Date.now(),
           })
           .link({ pipe: newPipeId })
