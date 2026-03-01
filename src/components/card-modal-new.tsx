@@ -1192,7 +1192,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                         onBlur={handleUpdateDescription}
                         rows={4}
                         className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="Add a description..."
+                        placeholder={t('addDescriptionPlaceholder')}
                       />
                     ) : (
                       <div
@@ -1803,19 +1803,19 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                 <div className="space-y-4">
                   {/* Compose SMS Section */}
                   <div className="border border-gray-300 rounded-lg p-4 bg-white">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Send SMS</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('sendSms')}</h3>
 
                     {/* Template Selector */}
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Use Template (Optional)
+                        {t('useTemplate')}
                       </label>
                       <select
                         value={selectedSmsTemplate}
                         onChange={(e) => handleSelectSmsTemplate(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
                       >
-                        <option value="">-- Select a template --</option>
+                        <option value="">{t('selectTemplate')}</option>
                         {smsTemplates.map((template: any) => (
                           <option key={template.id} value={template.id}>
                             {template.name}
@@ -1827,34 +1827,34 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                     {/* Phone Number Input */}
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        To (Phone Number from Card)
+                        {t('toPhoneNumber')}
                       </label>
                       <input
                         type="tel"
                         value={smsTo}
                         onChange={(e) => setSmsTo(e.target.value)}
-                        placeholder="+852XXXXXXXX"
+                        placeholder={t('phonePlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Use local number (e.g., 64522883) or international format (e.g., +85264522883)</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('phoneHelp')}</p>
                     </div>
 
                     {/* Message Body */}
                     <div className="mb-3">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Message
+                        {t('message')}
                       </label>
                       <textarea
                         value={smsBody}
                         onChange={(e) => setSmsBody(e.target.value)}
-                        placeholder="Type your message here..."
+                        placeholder={t('messagePlaceholder')}
                         rows={4}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
                       />
                       <div className="flex justify-between items-center mt-1">
-                        <p className="text-xs text-gray-500">{smsBody.length} / 160 characters</p>
+                        <p className="text-xs text-gray-500">{smsBody.length} / 160 {t('characters')}</p>
                         {smsBody.length > 160 && (
-                          <p className="text-xs text-orange-600">Message may be split into multiple SMS</p>
+                          <p className="text-xs text-orange-600">{t('messageSplit')}</p>
                         )}
                       </div>
                     </div>
@@ -1869,23 +1869,23 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                         }}
                         className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
                       >
-                        Clear
+                        {tCommon('clear')}
                       </button>
                       <button
                         onClick={handleSendSms}
                         disabled={sendingSms || !smsTo || !smsBody}
                         className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium transition-colors"
                       >
-                        {sendingSms ? "Sending..." : "Send SMS"}
+                        {sendingSms ? t('sending') : t('sendSmsButton')}
                       </button>
                     </div>
                   </div>
 
                   {/* SMS Messages List */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">SMS History</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('smsHistory')}</h3>
                     {smsMessages.length === 0 ? (
-                      <p className="text-gray-500 text-xs text-center py-8">No SMS messages yet</p>
+                      <p className="text-gray-500 text-xs text-center py-8">{t('noSms')}</p>
                     ) : (
                       <div className="space-y-2">
                         {smsMessages.map((sms: any) => (
@@ -1901,7 +1901,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                     ? "bg-blue-100 text-blue-700"
                                     : "bg-green-100 text-green-700"
                                 }`}>
-                                  {sms.direction === "sent" ? "Sent" : "Received"}
+                                  {sms.direction === "sent" ? t('sent') : t('received')}
                                 </span>
                                 {sms.status && (
                                   <span className={`px-2 py-0.5 text-[10px] rounded ${
@@ -1922,8 +1922,8 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
 
                             {/* Phone Numbers */}
                             <div className="text-xs text-gray-600 mb-2">
-                              <div><span className="font-medium">From:</span> {sms.from}</div>
-                              <div><span className="font-medium">To:</span> {sms.to}</div>
+                              <div><span className="font-medium">{t('from')}</span> {sms.from}</div>
+                              <div><span className="font-medium">{t('to')}</span> {sms.to}</div>
                             </div>
 
                             {/* Message Body */}
@@ -1980,7 +1980,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                 onClick={() => toggleHistory(item.id)}
                                 className="text-[10px] text-blue-600 hover:text-blue-800 mt-1.5 flex items-center gap-1"
                               >
-                                {expandedHistory.has(item.id) ? "Show less" : "Show more"}
+                                {expandedHistory.has(item.id) ? t('showLess') : t('showMore')}
                               </button>
                             </div>
                           );
@@ -2092,7 +2092,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                 onClick={() => toggleHistory(item.id)}
                                 className="text-[10px] text-blue-600 hover:text-blue-800 mt-1.5 flex items-center gap-1"
                               >
-                                {expandedHistory.has(item.id) ? "Show less" : "Show more"}
+                                {expandedHistory.has(item.id) ? t('showLess') : t('showMore')}
                               </button>
                             </div>
                           );
@@ -2199,12 +2199,12 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
             {/* Current Stage - Always at top */}
             <div className="px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <h3 className="text-base font-semibold text-gray-900 flex-shrink-0">Current Stage</h3>
+                <h3 className="text-base font-semibold text-gray-900 flex-shrink-0">{t('currentStage')}</h3>
                 <div
                   className="px-3 py-1 rounded-lg font-medium text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-md"
                   style={{ backgroundColor: currentStage?.backgroundColor || '#DBEAFE' }}
                 >
-                  {currentStage?.name || "No Stage"}
+                  {currentStage?.name || t('noStage')}
                 </div>
               </div>
             </div>
@@ -2220,16 +2220,39 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                   <div>
                     <div className="space-y-3">
                       {adminForms.map((form: any) => {
-                        const alreadySubmitted = currentStageSubmissions.some((sub: any) => sub.form?.id === form.id);
                         const isFillingThis = fillingFormId === form.id;
 
                         return (
                           <div
                             key={form.id}
-                            className="rounded-lg py-2 px-4 bg-white"
+                            className="border border-blue-200 rounded-lg p-4 bg-blue-50"
                           >
+                            {/* Form header - button only visible when collapsed */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900 text-sm">{form.name}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-gray-600">
+                                    {form.fields?.length || 0} {t('fields')}
+                                  </span>
+                                </div>
+                              </div>
+                              {!isFillingThis && (
+                                <button
+                                  onClick={() => handleStartFillingForm(form)}
+                                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-xs flex items-center gap-1"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  {t('fillForm') || 'Fill Form'}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Collapsible form fields */}
                             {isFillingThis && (
-                              <div className="mt-2 space-y-3 pt-2">
+                              <div className="mt-3 space-y-3 pt-3 border-t border-blue-200">
                                 {form.fields?.map((field: any) => {
                                   if (field.type === "content") {
                                     const processedContent = replacePlaceholders(field.content || "", {
@@ -2275,7 +2298,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                   }
 
                                   return (
-                                    <div key={field.id}>
+                                    <div key={field.id} className="bg-white rounded-lg p-3 border border-blue-200">
                                       <label className="block text-sm font-medium text-gray-700 mb-1">
                                         {field.label}
                                         {field.required && <span className="text-red-500 ml-1">*</span>}
@@ -2401,7 +2424,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                 {clientForms.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                      Client Forms (Waiting for Reply)
+                      {t('clientForms')}
                     </h3>
                     <div className="space-y-3">
                       {clientForms.map((form: any) => {
@@ -2416,14 +2439,14 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                               <div className="flex-1">
                                 <div className="font-medium text-gray-900 text-sm">{form.name}</div>
                                 <div className="text-xs text-gray-600">
-                                  {form.fields?.length || 0} fields
+                                  {form.fields?.length || 0} {t('fields')}
                                 </div>
                               </div>
                               <button
                                 onClick={() => setExpandedClientFormId(isExpanded ? null : form.id)}
                                 className="px-3 py-1 bg-violet-500 text-white rounded-lg hover:bg-violet-600 text-xs"
                               >
-                                {isExpanded ? "Hide Fields" : "View Fields"}
+                                {isExpanded ? t('hideFields') : t('viewFields')}
                               </button>
                             </div>
 
@@ -2431,7 +2454,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                               <div className="mt-4 space-y-3 border-t border-purple-200 pt-4">
                                 <div className="flex items-center justify-between mb-2">
                                   <p className="text-sm text-purple-700">
-                                    Preview only - Client will fill this form via link
+                                    {t('clientFormPreview')}
                                   </p>
                                   <button
                                     onClick={() => {
@@ -2570,7 +2593,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                         field.type === "textarea" ? (
                                           <textarea
                                             readOnly
-                                            placeholder="Client will enter text here..."
+                                            placeholder={t('clientPlaceholder')}
                                             rows={4}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-xs cursor-not-allowed"
                                           />
@@ -2903,7 +2926,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
             </div>
 
             {/* Card Info Title */}
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Card Info</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">{t('cardInfo')}</h3>
 
             <div className="space-y-4 text-sm">
               <div>
@@ -2911,7 +2934,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span>Created</span>
+                  <span>{t('created')}</span>
                 </div>
                 <div className="font-medium text-xs">
                   {new Date(card.createdAt).toLocaleDateString()}
@@ -2926,7 +2949,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>Updated</span>
+                  <span>{t('updated')}</span>
                 </div>
                 <div className="font-medium text-xs">
                   {new Date(card.updatedAt).toLocaleDateString()}
