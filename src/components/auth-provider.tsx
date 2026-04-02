@@ -1,7 +1,7 @@
 "use client";
 
 import { db } from "@/lib/db";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from 'next-intl';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -11,8 +11,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function SignedIn({ children }: { children: React.ReactNode }) {
   const t = useTranslations('common');
   const { user, isLoading } = db.useAuth();
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!user?.email) return;
+
+    setIsVerifying(true);
+    fetch("/api/auth/check-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.allowed) {
+          db.auth.signOut();
+        }
+      })
+      .catch(() => {
+        // Fail open on network errors to avoid locking out users unintentionally
+      })
+      .finally(() => setIsVerifying(false));
+  }, [user?.email]);
+
+  if (isLoading || isVerifying) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -49,16 +71,37 @@ export function Login() {
   const [sentEmail, setSentEmail] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
-    db.auth.sendMagicCode({ email }).catch((err) => {
-      alert("Error sending magic code: " + err.message);
-    });
+    setIsSending(true);
+    setErrorMessage("");
 
-    setSentEmail(email);
+    try {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.allowed) {
+        setErrorMessage(data.error || "This email is not authorized to access this application.");
+        return;
+      }
+
+      await db.auth.sendMagicCode({ email });
+      setSentEmail(email);
+    } catch (err: any) {
+      setErrorMessage("Error sending magic code. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleVerifyCode = (e: React.FormEvent) => {
@@ -142,11 +185,16 @@ export function Login() {
             />
           </div>
 
+          {errorMessage && (
+            <p className="mb-4 text-sm text-red-600">{errorMessage}</p>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            disabled={isSending}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Send magic code
+            {isSending ? "Checking..." : "Send magic code"}
           </button>
         </form>
 
