@@ -60,6 +60,20 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // Create email template ID mapping (old ID -> new ID)
+    const emailTemplateIdMap: Record<string, string> = {};
+    const emailTemplates = sourcePipe.email_templates || [];
+    emailTemplates.forEach((template: any) => {
+      emailTemplateIdMap[template.id] = generateId();
+    });
+
+    // Create SMS template ID mapping (old ID -> new ID)
+    const smsTemplateIdMap: Record<string, string> = {};
+    const smsTemplates = sourcePipe.sms_templates || [];
+    smsTemplates.forEach((template: any) => {
+      smsTemplateIdMap[template.id] = generateId();
+    });
+
     // Prepare transactions
     const transactions: any[] = [];
 
@@ -117,44 +131,36 @@ export async function POST(req: NextRequest) {
         let updatedActions = automation.actions;
         let updatedTriggerConfig = automation.triggerConfig;
 
-        // Replace old stage IDs with new stage IDs in JSON
+        const allIdMaps = [stageIdMap, formIdMap, emailTemplateIdMap, smsTemplateIdMap];
+
         if (updatedConditions) {
-          const conditionsStr = JSON.stringify(updatedConditions);
-          let newConditionsStr = conditionsStr;
-          Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-            newConditionsStr = newConditionsStr.replace(new RegExp(oldId, 'g'), newId);
+          let str = JSON.stringify(updatedConditions);
+          allIdMaps.forEach((idMap) => {
+            Object.entries(idMap).forEach(([oldId, newId]) => {
+              str = str.replace(new RegExp(oldId, 'g'), newId);
+            });
           });
-          // Replace old form IDs with new form IDs
-          Object.entries(formIdMap).forEach(([oldId, newId]) => {
-            newConditionsStr = newConditionsStr.replace(new RegExp(oldId, 'g'), newId);
-          });
-          updatedConditions = JSON.parse(newConditionsStr);
+          updatedConditions = JSON.parse(str);
         }
 
         if (updatedActions) {
-          const actionsStr = JSON.stringify(updatedActions);
-          let newActionsStr = actionsStr;
-          Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-            newActionsStr = newActionsStr.replace(new RegExp(oldId, 'g'), newId);
+          let str = JSON.stringify(updatedActions);
+          allIdMaps.forEach((idMap) => {
+            Object.entries(idMap).forEach(([oldId, newId]) => {
+              str = str.replace(new RegExp(oldId, 'g'), newId);
+            });
           });
-          // Replace old form IDs with new form IDs
-          Object.entries(formIdMap).forEach(([oldId, newId]) => {
-            newActionsStr = newActionsStr.replace(new RegExp(oldId, 'g'), newId);
-          });
-          updatedActions = JSON.parse(newActionsStr);
+          updatedActions = JSON.parse(str);
         }
 
         if (updatedTriggerConfig) {
-          const triggerConfigStr = JSON.stringify(updatedTriggerConfig);
-          let newTriggerConfigStr = triggerConfigStr;
-          Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-            newTriggerConfigStr = newTriggerConfigStr.replace(new RegExp(oldId, 'g'), newId);
+          let str = JSON.stringify(updatedTriggerConfig);
+          allIdMaps.forEach((idMap) => {
+            Object.entries(idMap).forEach(([oldId, newId]) => {
+              str = str.replace(new RegExp(oldId, 'g'), newId);
+            });
           });
-          // Replace old form IDs with new form IDs
-          Object.entries(formIdMap).forEach(([oldId, newId]) => {
-            newTriggerConfigStr = newTriggerConfigStr.replace(new RegExp(oldId, 'g'), newId);
-          });
-          updatedTriggerConfig = JSON.parse(newTriggerConfigStr);
+          updatedTriggerConfig = JSON.parse(str);
         }
 
         transactions.push(
@@ -174,7 +180,7 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    // 4.5. Create pipe-level automations (with updated stage and form references)
+    // 4.5. Create pipe-level automations (with updated references)
     const pipeAutomations = sourcePipe.automations || [];
     pipeAutomations.forEach((automation: any) => {
       const newAutomationId = generateId();
@@ -184,44 +190,36 @@ export async function POST(req: NextRequest) {
       let updatedActions = automation.actions;
       let updatedTriggerConfig = automation.triggerConfig;
 
-      // Replace old stage IDs with new stage IDs in JSON
+      const allIdMaps = [stageIdMap, formIdMap, emailTemplateIdMap, smsTemplateIdMap];
+
       if (updatedConditions) {
-        const conditionsStr = JSON.stringify(updatedConditions);
-        let newConditionsStr = conditionsStr;
-        Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-          newConditionsStr = newConditionsStr.replace(new RegExp(oldId, 'g'), newId);
+        let str = JSON.stringify(updatedConditions);
+        allIdMaps.forEach((idMap) => {
+          Object.entries(idMap).forEach(([oldId, newId]) => {
+            str = str.replace(new RegExp(oldId, 'g'), newId);
+          });
         });
-        // Replace old form IDs with new form IDs
-        Object.entries(formIdMap).forEach(([oldId, newId]) => {
-          newConditionsStr = newConditionsStr.replace(new RegExp(oldId, 'g'), newId);
-        });
-        updatedConditions = JSON.parse(newConditionsStr);
+        updatedConditions = JSON.parse(str);
       }
 
       if (updatedActions) {
-        const actionsStr = JSON.stringify(updatedActions);
-        let newActionsStr = actionsStr;
-        Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-          newActionsStr = newActionsStr.replace(new RegExp(oldId, 'g'), newId);
+        let str = JSON.stringify(updatedActions);
+        allIdMaps.forEach((idMap) => {
+          Object.entries(idMap).forEach(([oldId, newId]) => {
+            str = str.replace(new RegExp(oldId, 'g'), newId);
+          });
         });
-        // Replace old form IDs with new form IDs
-        Object.entries(formIdMap).forEach(([oldId, newId]) => {
-          newActionsStr = newActionsStr.replace(new RegExp(oldId, 'g'), newId);
-        });
-        updatedActions = JSON.parse(newActionsStr);
+        updatedActions = JSON.parse(str);
       }
 
       if (updatedTriggerConfig) {
-        const triggerConfigStr = JSON.stringify(updatedTriggerConfig);
-        let newTriggerConfigStr = triggerConfigStr;
-        Object.entries(stageIdMap).forEach(([oldId, newId]) => {
-          newTriggerConfigStr = newTriggerConfigStr.replace(new RegExp(oldId, 'g'), newId);
+        let str = JSON.stringify(updatedTriggerConfig);
+        allIdMaps.forEach((idMap) => {
+          Object.entries(idMap).forEach(([oldId, newId]) => {
+            str = str.replace(new RegExp(oldId, 'g'), newId);
+          });
         });
-        // Replace old form IDs with new form IDs
-        Object.entries(formIdMap).forEach(([oldId, newId]) => {
-          newTriggerConfigStr = newTriggerConfigStr.replace(new RegExp(oldId, 'g'), newId);
-        });
-        updatedTriggerConfig = JSON.parse(newTriggerConfigStr);
+        updatedTriggerConfig = JSON.parse(str);
       }
 
       transactions.push(
@@ -240,10 +238,9 @@ export async function POST(req: NextRequest) {
       );
     });
 
-    // 5. Create new email templates
-    const emailTemplates = sourcePipe.email_templates || [];
+    // 5. Create new email templates (using pre-built ID map)
     emailTemplates.forEach((template: any) => {
-      const newTemplateId = generateId();
+      const newTemplateId = emailTemplateIdMap[template.id];
       transactions.push(
         db.tx.email_templates[newTemplateId]
           .update({
@@ -262,10 +259,9 @@ export async function POST(req: NextRequest) {
       );
     });
 
-    // 6. Create new SMS templates
-    const smsTemplates = sourcePipe.sms_templates || [];
+    // 6. Create new SMS templates (using pre-built ID map)
     smsTemplates.forEach((template: any) => {
-      const newTemplateId = generateId();
+      const newTemplateId = smsTemplateIdMap[template.id];
       transactions.push(
         db.tx.sms_templates[newTemplateId]
           .update({
