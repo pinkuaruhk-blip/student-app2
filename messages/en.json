@@ -54,7 +54,14 @@
     "deleteAllCardsConfirm": "Delete all cards",
     "deletingAllCards": "Deleting...",
     "deleteAllCardsSuccess": "Deleted {count} cards from \"{name}\"",
-    "deleteAllCardsFailed": "Failed to delete cards"
+    "deleteAllCardsFailed": "Failed to delete cards",
+    "deletePipeTitle": "Delete this pipe?",
+    "deletePipeWarning": "This will permanently delete the pipe \"{name}\", along with all of its stages, cards, and everything inside them. This cannot be undone.",
+    "deletePipeTypePrompt": "To confirm, type the pipe name: {name}",
+    "deletePipeConfirm": "Delete pipe",
+    "deletingPipe": "Deleting...",
+    "deletePipeSuccess": "Deleted pipe \"{name}\"",
+    "deletePipeFailed": "Failed to delete pipe"
   },
   "card": {
     "details": "Details",

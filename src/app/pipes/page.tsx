@@ -30,6 +30,11 @@ export default function PipesPage() {
   const [deleteCardsPipeName, setDeleteCardsPipeName] = useState("");
   const [deleteCardsConfirmText, setDeleteCardsConfirmText] = useState("");
   const [isDeletingCards, setIsDeletingCards] = useState(false);
+  const [showDeletePipeModal, setShowDeletePipeModal] = useState(false);
+  const [deletePipeId, setDeletePipeId] = useState<string | null>(null);
+  const [deletePipeName, setDeletePipeName] = useState("");
+  const [deletePipeConfirmText, setDeletePipeConfirmText] = useState("");
+  const [isDeletingPipe, setIsDeletingPipe] = useState(false);
   const { user } = db.useAuth();
 
   // Query all pipes
@@ -97,14 +102,31 @@ export default function PipesPage() {
     setShowCreateForm(false);
   };
 
-  const handleDeletePipe = async (pipeId: string) => {
-    if (!confirm("Are you sure you want to delete this pipe? This will also delete all its stages and cards.")) {
-      return;
-    }
+  const handleDeletePipe = async () => {
+    if (!deletePipeId) return;
+    if (deletePipeConfirmText !== deletePipeName) return;
 
-    await db.transact([
-      db.tx.pipes[pipeId].delete(),
-    ]);
+    setIsDeletingPipe(true);
+    try {
+      await db.transact([
+        db.tx.pipes[deletePipeId].delete(),
+      ]);
+      showToast(
+        tPipes('deletePipeSuccess', { name: deletePipeName }),
+        "success"
+      );
+      setShowDeletePipeModal(false);
+      setDeletePipeId(null);
+      setDeletePipeName("");
+      setDeletePipeConfirmText("");
+    } catch (err) {
+      showToast(
+        `${tPipes('deletePipeFailed')}: ${err instanceof Error ? err.message : String(err)}`,
+        "error"
+      );
+    } finally {
+      setIsDeletingPipe(false);
+    }
   };
 
   const handleDuplicatePipe = async (pipeId: string) => {
@@ -388,7 +410,10 @@ export default function PipesPage() {
                               <button
                                 onClick={() => {
                                   setOpenKebabMenuId(null);
-                                  handleDeletePipe(pipe.id);
+                                  setDeletePipeId(pipe.id);
+                                  setDeletePipeName(pipe.name);
+                                  setDeletePipeConfirmText("");
+                                  setShowDeletePipeModal(true);
                                 }}
                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                               >
@@ -490,6 +515,54 @@ export default function PipesPage() {
                     className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {isDeletingCards ? tPipes('deletingAllCards') : tPipes('deleteAllCardsConfirm')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Pipe Modal */}
+          {showDeletePipeModal && deletePipeId && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <h2 className="text-xl font-bold mb-2 text-gray-900">
+                  {tPipes('deletePipeTitle')}
+                </h2>
+                <p className="text-sm text-gray-700 mb-4">
+                  {tPipes('deletePipeWarning', { name: deletePipeName })}
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  {tPipes('deletePipeTypePrompt', { name: deletePipeName })}
+                </p>
+                <input
+                  type="text"
+                  value={deletePipeConfirmText}
+                  onChange={(e) => setDeletePipeConfirmText(e.target.value)}
+                  placeholder={deletePipeName}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4 text-gray-900"
+                  autoFocus
+                />
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeletePipeModal(false);
+                      setDeletePipeId(null);
+                      setDeletePipeName("");
+                      setDeletePipeConfirmText("");
+                    }}
+                    disabled={isDeletingPipe}
+                    className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    {tCommon('cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeletePipe}
+                    disabled={isDeletingPipe || deletePipeConfirmText !== deletePipeName}
+                    className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isDeletingPipe ? tPipes('deletingPipe') : tPipes('deletePipeConfirm')}
                   </button>
                 </div>
               </div>

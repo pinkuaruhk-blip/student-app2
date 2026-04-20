@@ -54,7 +54,14 @@
     "deleteAllCardsConfirm": "刪除所有卡片",
     "deletingAllCards": "刪除中...",
     "deleteAllCardsSuccess": "已從「{name}」刪除 {count} 張卡片",
-    "deleteAllCardsFailed": "刪除卡片失敗"
+    "deleteAllCardsFailed": "刪除卡片失敗",
+    "deletePipeTitle": "刪除此管道？",
+    "deletePipeWarning": "此操作將永久刪除管道「{name}」，連同其所有階段、卡片以及其中的一切內容。此操作無法復原。",
+    "deletePipeTypePrompt": "請輸入管道名稱以確認：{name}",
+    "deletePipeConfirm": "刪除管道",
+    "deletingPipe": "刪除中...",
+    "deletePipeSuccess": "已刪除管道「{name}」",
+    "deletePipeFailed": "刪除管道失敗"
   },
   "card": {
     "details": "詳情",
