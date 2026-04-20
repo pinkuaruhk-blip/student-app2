@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { id } from "@instantdb/react";
 import { useTranslations } from 'next-intl';
+import { useToast } from "@/contexts/toast-context";
 
 export default function PipesPage() {
   const t = useTranslations();
@@ -23,6 +24,12 @@ export default function PipesPage() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renamePipeId, setRenamePipeId] = useState<string | null>(null);
   const [renamePipeName, setRenamePipeName] = useState("");
+  const { showToast } = useToast();
+  const [showDeleteCardsModal, setShowDeleteCardsModal] = useState(false);
+  const [deleteCardsPipeId, setDeleteCardsPipeId] = useState<string | null>(null);
+  const [deleteCardsPipeName, setDeleteCardsPipeName] = useState("");
+  const [deleteCardsConfirmText, setDeleteCardsConfirmText] = useState("");
+  const [isDeletingCards, setIsDeletingCards] = useState(false);
   const { user } = db.useAuth();
 
   // Query all pipes
@@ -149,6 +156,38 @@ export default function PipesPage() {
     setRenamePipeId(null);
     setRenamePipeName("");
     setOpenKebabMenuId(null);
+  };
+
+  const handleDeleteAllCards = async () => {
+    if (!deleteCardsPipeId) return;
+    if (deleteCardsConfirmText !== deleteCardsPipeName) return;
+
+    setIsDeletingCards(true);
+    try {
+      const response = await fetch("/api/delete-all-cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipeId: deleteCardsPipeId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to delete cards");
+
+      showToast(
+        tPipes('deleteAllCardsSuccess', { count: result.deletedCount, name: deleteCardsPipeName }),
+        "success"
+      );
+      setShowDeleteCardsModal(false);
+      setDeleteCardsPipeId(null);
+      setDeleteCardsPipeName("");
+      setDeleteCardsConfirmText("");
+    } catch (err) {
+      showToast(
+        `${tPipes('deleteAllCardsFailed')}: ${err instanceof Error ? err.message : String(err)}`,
+        "error"
+      );
+    } finally {
+      setIsDeletingCards(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -337,6 +376,18 @@ export default function PipesPage() {
                               <button
                                 onClick={() => {
                                   setOpenKebabMenuId(null);
+                                  setDeleteCardsPipeId(pipe.id);
+                                  setDeleteCardsPipeName(pipe.name);
+                                  setDeleteCardsConfirmText("");
+                                  setShowDeleteCardsModal(true);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                {tPipes('deleteAllCards')}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setOpenKebabMenuId(null);
                                   handleDeletePipe(pipe.id);
                                 }}
                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -393,6 +444,54 @@ export default function PipesPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Delete All Cards Modal */}
+          {showDeleteCardsModal && deleteCardsPipeId && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <h2 className="text-xl font-bold mb-2 text-gray-900">
+                  {tPipes('deleteAllCardsTitle')}
+                </h2>
+                <p className="text-sm text-gray-700 mb-4">
+                  {tPipes('deleteAllCardsWarning', { name: deleteCardsPipeName })}
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  {tPipes('deleteAllCardsTypePrompt', { name: deleteCardsPipeName })}
+                </p>
+                <input
+                  type="text"
+                  value={deleteCardsConfirmText}
+                  onChange={(e) => setDeleteCardsConfirmText(e.target.value)}
+                  placeholder={deleteCardsPipeName}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-4 text-gray-900"
+                  autoFocus
+                />
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeleteCardsModal(false);
+                      setDeleteCardsPipeId(null);
+                      setDeleteCardsPipeName("");
+                      setDeleteCardsConfirmText("");
+                    }}
+                    disabled={isDeletingCards}
+                    className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    {tCommon('cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllCards}
+                    disabled={isDeletingCards || deleteCardsConfirmText !== deleteCardsPipeName}
+                    className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isDeletingCards ? tPipes('deletingAllCards') : tPipes('deleteAllCardsConfirm')}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -46,7 +46,15 @@
     "oldestFirst": "Oldest updated first",
     "back": "Back",
     "backToPipes": "Back to Pipes",
-    "errorLoading": "Error loading board"
+    "errorLoading": "Error loading board",
+    "deleteAllCards": "Delete all cards",
+    "deleteAllCardsTitle": "Delete all cards in this pipe?",
+    "deleteAllCardsWarning": "This will permanently delete every card in \"{name}\", along with all of their fields, comments, emails, SMS, history, form submissions, and automation logs. The pipe, stages, automations, and templates will not be touched. This cannot be undone.",
+    "deleteAllCardsTypePrompt": "To confirm, type the pipe name: {name}",
+    "deleteAllCardsConfirm": "Delete all cards",
+    "deletingAllCards": "Deleting...",
+    "deleteAllCardsSuccess": "Deleted {count} cards from \"{name}\"",
+    "deleteAllCardsFailed": "Failed to delete cards"
   },
   "card": {
     "details": "Details",

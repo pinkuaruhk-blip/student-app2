@@ -46,7 +46,15 @@
     "oldestFirst": "最旧更新优先",
     "back": "返回",
     "backToPipes": "返回管道",
-    "errorLoading": "载入看板时发生错误"
+    "errorLoading": "载入看板时发生错误",
+    "deleteAllCards": "删除所有卡片",
+    "deleteAllCardsTitle": "删除此管道内所有卡片？",
+    "deleteAllCardsWarning": "此操作将永久删除「{name}」中的每一张卡片，连同其所有字段、留言、电邮、SMS、历史记录、表单提交和自动化日志。管道、阶段、自动化和模板不会被删除。此操作无法撤销。",
+    "deleteAllCardsTypePrompt": "请输入管道名称以确认：{name}",
+    "deleteAllCardsConfirm": "删除所有卡片",
+    "deletingAllCards": "删除中...",
+    "deleteAllCardsSuccess": "已从「{name}」删除 {count} 张卡片",
+    "deleteAllCardsFailed": "删除卡片失败"
   },
   "card": {
     "details": "详情",
