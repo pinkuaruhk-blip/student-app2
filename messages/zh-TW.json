@@ -202,6 +202,13 @@
     "card": "卡片",
     "contactAdministrator": "如需更改，請聯絡管理員。",
     "for": "用於",
-    "submit": "提交"
+    "submit": "提交",
+    "fileAccepted": "接受格式",
+    "fileMaxSize": "最大大小：2MB",
+    "uploading": "上傳中…",
+    "fileTooLarge": "檔案過大（{size}MB）。最大大小為 2MB。",
+    "fileInvalidType": "檔案類型無效。接受的類型：{types}",
+    "fileUploadFailed": "上傳檔案失敗，請重試。",
+    "fileReadFailed": "讀取檔案失敗，請重試。"
   }
 }

@@ -97,6 +97,7 @@ export default function PublicFormPage({ params }: PageProps) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
+  const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
   // Query the form, card, and check for existing submissions
   const { data, isLoading } = db.useQuery({
@@ -196,7 +197,7 @@ export default function PublicFormPage({ params }: PageProps) {
       const sizeMB = (file.size / 1024 / 1024).toFixed(2);
       setFileErrors((prev) => ({
         ...prev,
-        [fieldName]: `File is too large (${sizeMB}MB). Maximum size is 2MB.`,
+        [fieldName]: tForms('fileTooLarge', { size: sizeMB }),
       }));
       setResponses({
         ...responses,
@@ -239,7 +240,7 @@ export default function PublicFormPage({ params }: PageProps) {
       if (!isValid) {
         setFileErrors((prev) => ({
           ...prev,
-          [fieldName]: `Invalid file type. Accepted types: ${acceptedTypes}`,
+          [fieldName]: tForms('fileInvalidType', { types: acceptedTypes }),
         }));
         // Clear the file input
         setResponses({
@@ -252,6 +253,7 @@ export default function PublicFormPage({ params }: PageProps) {
 
     // Convert file to base64 and upload to server
     const reader = new FileReader();
+    setUploadingFiles((prev) => ({ ...prev, [fieldName]: true }));
     reader.onloadend = async () => {
       const base64String = reader.result as string;
       console.log("File converted to base64, uploading to server...");
@@ -292,11 +294,17 @@ export default function PublicFormPage({ params }: PageProps) {
         console.error("Error uploading file:", error);
         setFileErrors((prev) => ({
           ...prev,
-          [fieldName]: "Failed to upload file. Please try again.",
+          [fieldName]: tForms('fileUploadFailed'),
         }));
         setResponses({
           ...responses,
           [fieldName]: null,
+        });
+      } finally {
+        setUploadingFiles((prev) => {
+          const next = { ...prev };
+          delete next[fieldName];
+          return next;
         });
       }
     };
@@ -304,8 +312,13 @@ export default function PublicFormPage({ params }: PageProps) {
       console.error("Error reading file:", error);
       setFileErrors((prev) => ({
         ...prev,
-        [fieldName]: "Failed to read file. Please try again.",
+        [fieldName]: tForms('fileReadFailed'),
       }));
+      setUploadingFiles((prev) => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -670,13 +683,19 @@ export default function PublicFormPage({ params }: PageProps) {
                     <div className="flex items-start gap-2">
                       {field.acceptedFileTypes && (
                         <p className="text-xs text-gray-500">
-                          Accepted: <code className="bg-gray-100 px-1 py-0.5 rounded">{field.acceptedFileTypes}</code>
+                          {tForms('fileAccepted')}: <code className="bg-gray-100 px-1 py-0.5 rounded">{field.acceptedFileTypes}</code>
                         </p>
                       )}
                       <p className="text-xs text-gray-500">
-                        • Max size: 2MB
+                        • {tForms('fileMaxSize')}
                       </p>
                     </div>
+                    {uploadingFiles[field.name] && !fileErrors[field.name] && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded border border-blue-200">
+                        <span className="inline-block h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        <span>{tForms('uploading')}</span>
+                      </div>
+                    )}
                     {fileErrors[field.name] && (
                       <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded border border-red-200">
                         <span>⚠️</span>

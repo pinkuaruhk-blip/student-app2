@@ -202,6 +202,13 @@
     "card": "Card",
     "contactAdministrator": "If you need to make changes, please contact the administrator.",
     "for": "For",
-    "submit": "Submit"
+    "submit": "Submit",
+    "fileAccepted": "Accepted",
+    "fileMaxSize": "Max size: 2MB",
+    "uploading": "Uploading…",
+    "fileTooLarge": "File is too large ({size}MB). Maximum size is 2MB.",
+    "fileInvalidType": "Invalid file type. Accepted types: {types}",
+    "fileUploadFailed": "Failed to upload file. Please try again.",
+    "fileReadFailed": "Failed to read file. Please try again."
   }
 }
