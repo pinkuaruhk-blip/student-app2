@@ -1025,7 +1025,6 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
     <div
       className="fixed inset-0 flex items-center justify-center p-4 z-50"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
-      onClick={onClose}
     >
       <div
         className="bg-white rounded-lg w-full max-w-7xl h-[90vh] flex flex-col relative"
