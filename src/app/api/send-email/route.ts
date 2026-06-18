@@ -216,9 +216,15 @@ function resolveEffectiveSender(
  */
 export async function POST(request: NextRequest) {
   const debugLogs: string[] = [];
-  const log = (message: string, ...args: any[]) => {
-    console.log(message, ...args);
-    debugLogs.push(message + (args.length ? " " + JSON.stringify(args) : ""));
+  const log = (message: string, value?: string | number | boolean | null) => {
+    if (value === undefined) {
+      console.log(`[send-email] ${message}`);
+      debugLogs.push(message);
+      return;
+    }
+
+    console.log(`[send-email] ${message}`, value);
+    debugLogs.push(`${message}: ${String(value)}`);
   };
 
   try {
@@ -239,22 +245,10 @@ export async function POST(request: NextRequest) {
       bcc,
       sentVia,
     } = requestBody;
-    const hasRawCardIdKey = Object.prototype.hasOwnProperty.call(requestBody, "cardId");
     const rawCardId = requestBody.cardId;
     const normalizedCardId = normalizeOptionalString(rawCardId);
-
-    log("=== Send Email Request ===");
-    log("To:", to);
-    log("From:", from || "system");
-    log("CC:", cc || "none");
-    log("BCC:", bcc || "none");
-    log("Subject:", subject);
-    log("Card ID:", rawCardId);
-    log("cardId key present in request body:", hasRawCardIdKey);
-    log("cardId value type:", rawCardId === null ? "null" : typeof rawCardId);
-    log("normalizedCardId present:", Boolean(normalizedCardId));
-    log("Normalized Card ID:", normalizedCardId || "(none)");
-    log("========================");
+    log("request started");
+    log("normalizedCardId present", Boolean(normalizedCardId));
 
     // Validate required fields
     if (!to || !subject || !body) {
@@ -292,8 +286,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    log("Normalized CC:", normalizedCc || "none");
-    log("Normalized BCC:", normalizedBcc || "none");
+    const recipientCount =
+      1 + (normalizedCc?.length || 0) + (normalizedBcc?.length || 0);
+    log("recipient count", recipientCount);
 
     if (!RESEND_API_KEY) {
       return NextResponse.json(
@@ -314,7 +309,7 @@ export async function POST(request: NextRequest) {
       });
       systemSettingsData = systemSettings?.system_settings?.[0];
     } catch (error) {
-      log("⚠️ Error fetching system settings from database:", error);
+      console.warn("[send-email] Error fetching system settings from database:", error);
     }
 
     // Get email configuration from database first, then fall back to environment variables
@@ -324,16 +319,10 @@ export async function POST(request: NextRequest) {
     // Use database values if available, otherwise fall back to env vars
     if (systemSettingsData?.defaultFromEmail) {
       defaultFromEmail = systemSettingsData.defaultFromEmail;
-      log("Using defaultFromEmail from database:", defaultFromEmail);
-    } else {
-      log("Using defaultFromEmail from env:", defaultFromEmail || "(none)");
     }
 
     if (systemSettingsData?.defaultFromName) {
       defaultFromName = systemSettingsData.defaultFromName;
-      log("Using defaultFromName from database:", defaultFromName);
-    } else {
-      log("Using defaultFromName from env:", defaultFromName || "(none)");
     }
 
     if (!defaultFromEmail || !isValidEmail(defaultFromEmail)) {
@@ -354,8 +343,8 @@ export async function POST(request: NextRequest) {
       defaultFromName
     );
 
-    log("Effective From:", effectiveFromEmail);
-    log("Effective From Name:", effectiveFromName || "(none)");
+    const fromSource = from && isValidEmail(from) ? "request" : "default";
+    log("from source", fromSource);
 
     // Format the "from" field for database storage
     // Store as "Name <email>" if name is available, otherwise just "email"
@@ -372,8 +361,6 @@ export async function POST(request: NextRequest) {
     const baseUrl = forwardedHost
       ? `${protocol}://${forwardedHost}`
       : (host ? `${protocol}://${host}` : request.nextUrl.origin);
-
-    log("Base URL for email links:", baseUrl);
 
     // Replace placeholders in subject and body with actual card data
     let processedSubject = subject;
@@ -406,17 +393,6 @@ export async function POST(request: NextRequest) {
           const card = cardWithSubmissions?.cards?.[0];
           const submissions = card?.form_submissions || [];
 
-          log(`Raw submissions count: ${submissions.length}`);
-          submissions.forEach((sub: any, idx: number) => {
-            const formObj = Array.isArray(sub.form) ? sub.form[0] : sub.form;
-            log(`  Raw sub ${idx}:`, {
-              hasForm: !!sub.form,
-              isArray: Array.isArray(sub.form),
-              formId: formObj?.id,
-              formName: formObj?.name,
-            });
-          });
-
           formSubmissions = submissions.map((sub: any) => {
             // Form is returned as an array, take first element
             const formObj = Array.isArray(sub.form) ? sub.form[0] : sub.form;
@@ -429,17 +405,8 @@ export async function POST(request: NextRequest) {
             };
           });
 
-          log(`Found ${formSubmissions.length} form submissions for card ${normalizedCardId}`);
-          formSubmissions.forEach((sub, index) => {
-            log(`  Submission ${index + 1}:`, {
-              formId: sub.form?.id,
-              formName: sub.form?.name,
-              formObject: sub.form,
-              responseKeys: Object.keys(sub.responses || {}),
-            });
-          });
         } catch (error) {
-          log("Error fetching form submissions:", error);
+          console.warn("[send-email] Error fetching form submissions:", error);
         }
       }
 
@@ -461,24 +428,18 @@ export async function POST(request: NextRequest) {
       processedSubject = replacePlaceholders(subject, placeholderData, baseUrl);
       processedBody = replacePlaceholders(body, placeholderData, baseUrl);
 
-      log("Placeholders replaced in subject and body");
     }
 
     // Replace global variables from system settings (already fetched above)
     const globalVariables = systemSettingsData?.globalVariables || [];
 
     if (Array.isArray(globalVariables) && globalVariables.length > 0) {
-      log(`Found ${globalVariables.length} global variables`);
-
       // Replace global variables in subject and body
       globalVariables.forEach((variable: { name: string; value: string }) => {
         const placeholder = `{{${variable.name}}}`;
         processedSubject = processedSubject.replace(new RegExp(placeholder, 'g'), variable.value);
         processedBody = processedBody.replace(new RegExp(placeholder, 'g'), variable.value);
-        log(`  Replaced ${placeholder} with ${variable.value}`);
       });
-
-      log("Global variables replaced in subject and body");
     }
 
     // Generate unique email ID for tracking
@@ -490,8 +451,7 @@ export async function POST(request: NextRequest) {
       ? `${processedSubject} [#${normalizedCardId}]`
       : processedSubject;
 
-    log("Subject with card ID:", subjectWithCardId);
-    log("Sending via Resend");
+    log("sending via Resend");
 
     let persisted = false;
     let persistenceReason: "card_emails_logged" | "missing_card_id" | "card_email_log_failed" =
@@ -503,9 +463,8 @@ export async function POST(request: NextRequest) {
       bounceMessage?: string;
     }) => {
       if (!normalizedCardId) {
-        log(
-          "ℹ️ Skipping card_emails persistence because normalizedCardId is missing; email send attempted without DB logging"
-        );
+        log("persisted", false);
+        log("persistenceReason", "missing_card_id");
         persistenceReason = "missing_card_id";
         return;
       }
@@ -513,13 +472,6 @@ export async function POST(request: NextRequest) {
       try {
         const cardEmailId = id();
         const sentTimestamp = Date.now();
-        log("Saving email attempt to database, cardId:", normalizedCardId, "emailId:", cardEmailId);
-        log("Resend delivery tracking fields:", {
-          hasResendId: Boolean(params.resendId),
-          status: params.status,
-          provider: RESEND_PROVIDER,
-        });
-
         await adminDb.transact([
           adminDb.tx.card_emails[cardEmailId].update({
             direction: "sent",
@@ -542,32 +494,15 @@ export async function POST(request: NextRequest) {
 
         persisted = true;
         persistenceReason = "card_emails_logged";
-        log("✅ Email attempt logged to database");
-        log("✅ Resend ID stored in card_emails:", Boolean(params.resendId));
-
-        try {
-          const verificationResult = await adminDb.query({
-            card_emails: {
-              $: {
-                where: {
-                  id: cardEmailId,
-                },
-              },
-            },
-          });
-          const verificationFound = Boolean(verificationResult?.card_emails?.[0]);
-          log("Post-write verification card_emails found:", verificationFound);
-        } catch (verificationError: any) {
-          log(
-            "⚠️ card_emails verification query failed:",
-            verificationError?.message || "unknown verification error"
-          );
-        }
+        log("persisted", true);
+        log("persistenceReason", persistenceReason);
       } catch (dbError: any) {
         persisted = false;
         persistenceReason = "card_email_log_failed";
-        log(
-          "⚠️ Failed to log email attempt to database:",
+        log("persisted", false);
+        log("persistenceReason", persistenceReason);
+        console.error(
+          "[send-email] Failed to log email attempt to database:",
           dbError?.message || "unknown database error"
         );
         // Don't fail the request if database logging fails
@@ -592,7 +527,8 @@ export async function POST(request: NextRequest) {
     if (resendError) {
       console.error("❌ Resend error:", resendError);
       const resendErrorDetails = parseResendError(resendError);
-      log("❌ Resend error safe shape:", resendErrorDetails.safeShape);
+      log("Resend send failure");
+      log("resendId present", false);
 
       await persistCardEmailAttempt({
         status: resendErrorDetails.sendStatus,
@@ -624,14 +560,13 @@ export async function POST(request: NextRequest) {
     }
 
     const resendId = resendData?.id;
-    log("✅ Resend response id:", resendId);
+    log("Resend send success");
+    log("resendId present", Boolean(resendId));
 
     await persistCardEmailAttempt({
       status: "sent",
       resendId,
     });
-
-    log("✅ Email sent successfully via Resend");
 
     return NextResponse.json({
       success: true,
@@ -647,7 +582,8 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error("❌ Error sending email:", error);
     const safeError = parseResendError(error);
-    log("❌ Unexpected email send error safe shape:", safeError.safeShape);
+    log("Resend send failure");
+    log("resendId present", false);
     return NextResponse.json(
       {
         success: false,

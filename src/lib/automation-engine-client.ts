@@ -8,14 +8,6 @@ import { db } from "./db";
 import { id as generateId } from "@instantdb/react";
 import { processEmailTemplate, getFormLink } from "./email-templates";
 
-function maskEmail(email: string | null | undefined): string {
-  if (!email) return "(empty)";
-  const str = String(email);
-  const at = str.indexOf("@");
-  if (at <= 1) return str[0] + "***" + str.slice(at);
-  return str[0] + "***" + str.slice(at);
-}
-
 /**
  * Check if automations should be triggered and execute them
  */
@@ -457,10 +449,6 @@ async function executeSendEmailAction(
   config: { recipientField?: string; templateId: string },
   cardId: string
 ): Promise<any> {
-  const TAG = "[send_email:client]";
-  console.log(`${TAG} === DIAGNOSTIC START ===`);
-  console.log(`${TAG} cardId=${cardId}, templateId=${config.templateId}, recipientField=${config.recipientField ?? "(not set)"}`);
-
   const { data } = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
@@ -472,41 +460,41 @@ async function executeSendEmailAction(
 
   const card = data?.cards?.[0];
   if (!card) {
-    console.error(`${TAG} Card NOT found for id=${cardId}`);
+    console.error("[send_email:client] Card not found", {
+      cardId,
+      templateId: config.templateId,
+      recipientResolved: false,
+    });
     throw new Error("Card not found");
   }
-  console.log(`${TAG} card found, title="${card.title}", fields count=${card.fields?.length ?? 0}`);
 
   const template = data?.email_templates?.[0];
-  console.log(`${TAG} template found=${!!template}, templateId=${config.templateId}`);
   if (!template) {
-    console.error(`${TAG} Email template NOT found for templateId=${config.templateId}`);
+    console.error("[send_email:client] Email template not found", {
+      cardId,
+      templateId: config.templateId,
+      recipientResolved: false,
+    });
     throw new Error("Email template not found");
   }
-  console.log(`${TAG} template name="${template.name}", toEmail=${maskEmail(template.toEmail)}`);
 
   let recipientEmail: string | null = null;
-  let recipientSource = "none";
 
   if (config.recipientField) {
     const recipientField = card.fields?.find((f: any) => f.key === config.recipientField);
-    console.log(`${TAG} recipientField key="${config.recipientField}", field found=${!!recipientField}, value present=${!!recipientField?.value}`);
     recipientEmail = recipientField?.value ?? null;
-    if (recipientEmail) recipientSource = `cardField:${config.recipientField}`;
-  } else {
-    console.log(`${TAG} recipientField not configured in action config`);
   }
 
   if (!recipientEmail && template.toEmail) {
     recipientEmail = template.toEmail;
-    recipientSource = "template.toEmail";
-    console.log(`${TAG} falling back to template.toEmail`);
   }
 
-  console.log(`${TAG} recipientResolved=${!!recipientEmail}, source=${recipientSource}, masked=${maskEmail(recipientEmail)}`);
-
   if (!recipientEmail) {
-    console.error(`${TAG} NO recipient email resolved — aborting`);
+    console.error("[send_email:client] Recipient not resolved", {
+      cardId,
+      templateId: config.templateId,
+      recipientResolved: false,
+    });
     throw new Error(`No recipient email found. Either specify a recipient field in automation config or set "To Email" in the email template.`);
   }
 
@@ -527,8 +515,6 @@ async function executeSendEmailAction(
   const subject = processEmailTemplate(template.subject, emailData);
   const body = processEmailTemplate(template.body, emailData);
 
-  console.log(`${TAG} calling /api/send-email, to=${maskEmail(recipientEmail)}, subject="${subject}"`);
-
   const response = await fetch("/api/send-email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -546,15 +532,16 @@ async function executeSendEmailAction(
     }),
   });
 
-  console.log(`${TAG} /api/send-email response status=${response.status}`);
-
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`${TAG} /api/send-email FAILED: status=${response.status}, body=${errorText}`);
+    console.error("[send_email:client] /api/send-email failed", {
+      cardId,
+      templateId: config.templateId,
+      recipientResolved: true,
+      sendEmailStatus: response.status,
+    });
     throw new Error(`Failed to send email: ${errorText}`);
   }
-
-  console.log(`${TAG} === DIAGNOSTIC END (success) ===`);
   return { recipientEmail, subject };
 }
 

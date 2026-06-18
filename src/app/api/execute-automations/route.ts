@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { init } from "@instantdb/admin";
 
-function maskEmail(email: string | null | undefined): string {
-  if (!email) return "(empty)";
-  const str = String(email);
-  const at = str.indexOf("@");
-  if (at <= 1) return str[0] + "***" + str.slice(at);
-  return str[0] + "***" + str.slice(at);
-}
-
 // Initialize InstantDB Admin SDK locally
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || "f0827431-76de-4f51-a2c3-bae2e1558bcc";
 const ADMIN_KEY = process.env.INSTANT_ADMIN_KEY;
@@ -128,15 +120,17 @@ export async function POST(request: NextRequest) {
               }, 100);
             }
           } else if (action.type === "send_email") {
-            const TAG = "[send_email:execRoute]";
-            console.log(`${TAG} === DIAGNOSTIC START ===`);
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-            console.log(`${TAG} cardId=${cardId}, baseUrl=${baseUrl}`);
 
             const templateId = action.config?.templateId;
-            console.log(`${TAG} templateId=${templateId ?? "(not set)"}, recipientField=${action.config?.recipientField ?? "(not set)"}`);
             if (!templateId) {
-              console.error(`${TAG} templateId missing — aborting`);
+              console.error("[send_email:execRoute] Missing templateId", {
+                automationId: automation.id,
+                actionId: action.id,
+                cardId,
+                templateId: null,
+                recipientResolved: false,
+              });
               throw new Error("Template ID is required for send_email action");
             }
 
@@ -147,16 +141,19 @@ export async function POST(request: NextRequest) {
             });
 
             const template = templateData?.email_templates?.[0];
-            console.log(`${TAG} template found=${!!template}`);
             if (!template) {
-              console.error(`${TAG} Email template NOT found for templateId=${templateId}`);
+              console.error("[send_email:execRoute] Email template not found", {
+                automationId: automation.id,
+                actionId: action.id,
+                cardId,
+                templateId,
+                recipientResolved: false,
+              });
               throw new Error(`Email template not found: ${templateId}`);
             }
-            console.log(`${TAG} template name="${template.name}", toEmail=${maskEmail(template.toEmail)}`);
 
             const recipientFieldKey = action.config?.recipientField;
             let recipientEmail: string | null = null;
-            let recipientSource = "none";
 
             if (recipientFieldKey) {
               const cardDataQuery = await db.query({
@@ -170,19 +167,20 @@ export async function POST(request: NextRequest) {
               const card = cardDataQuery?.cards?.[0];
               const recipientField = card?.fields?.find((f: any) => f.key === recipientFieldKey);
               recipientEmail = recipientField?.value ?? null;
-              console.log(`${TAG} recipientField key="${recipientFieldKey}", field found=${!!recipientField}, value present=${!!recipientEmail}`);
-              if (recipientEmail) recipientSource = `cardField:${recipientFieldKey}`;
             }
 
             if (!recipientEmail && template.toEmail) {
               recipientEmail = template.toEmail;
-              recipientSource = "template.toEmail";
             }
 
-            console.log(`${TAG} recipientResolved=${!!recipientEmail}, source=${recipientSource}, masked=${maskEmail(recipientEmail)}`);
-
             if (!recipientEmail) {
-              console.error(`${TAG} NO recipient email resolved — aborting`);
+              console.error("[send_email:execRoute] Recipient not resolved", {
+                automationId: automation.id,
+                actionId: action.id,
+                cardId,
+                templateId,
+                recipientResolved: false,
+              });
               throw new Error(`No recipient email found. Either specify a recipient field in automation config or set "To Email" in the email template.`);
             }
 
@@ -194,8 +192,6 @@ export async function POST(request: NextRequest) {
               },
             });
             const card = cardDataQuery?.cards?.[0];
-
-            console.log(`${TAG} calling ${baseUrl}/api/send-email, to=${maskEmail(recipientEmail)}`);
 
             const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
               method: "POST",
@@ -212,14 +208,18 @@ export async function POST(request: NextRequest) {
               }),
             });
 
-            console.log(`${TAG} /api/send-email response status=${emailResponse.status}`);
-
             if (!emailResponse.ok) {
               const errorText = await emailResponse.text();
-              console.error(`${TAG} /api/send-email FAILED: status=${emailResponse.status}, body=${errorText}`);
+              console.error("[send_email:execRoute] /api/send-email failed", {
+                automationId: automation.id,
+                actionId: action.id,
+                cardId,
+                templateId,
+                recipientResolved: true,
+                sendEmailStatus: emailResponse.status,
+              });
               throw new Error(`Email send failed: ${errorText}`);
             }
-            console.log(`${TAG} === DIAGNOSTIC END (success) ===`);
           }
         }
 
