@@ -24,6 +24,11 @@ type CardModalProps = {
 
 type TabType = "details" | "emails" | "sms" | "history" | "comments" | "activities";
 
+const RESEND_ERROR_FALLBACK_MESSAGE =
+  "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
+const RESEND_ERROR_HINT_TEXT =
+  "Check the recipient address and Resend dashboard for delivery details.";
+
 export function CardModalNew({ card, onClose }: CardModalProps) {
   const t = useTranslations('card');
   const tCommon = useTranslations('common');
@@ -176,6 +181,8 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
       case "bounced":
       case "failed":
         return "bg-red-100 text-red-700";
+      case "suppressed":
+        return "bg-orange-100 text-orange-700";
       case "delayed":
         return "bg-amber-100 text-amber-700";
       case "complained":
@@ -195,7 +202,12 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
 
     const normalizedStatus = email.status?.toLowerCase();
     if (
-      (normalizedStatus === "bounced" || normalizedStatus === "failed" || normalizedStatus === "complained") &&
+      (
+        normalizedStatus === "bounced" ||
+        normalizedStatus === "failed" ||
+        normalizedStatus === "complained" ||
+        normalizedStatus === "suppressed"
+      ) &&
       email.bounceMessage
     ) {
       details.push(email.bounceMessage);
@@ -586,10 +598,15 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
         }),
       });
 
+      const responseBody = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Server error:", errorData);
-        throw new Error(errorData.error || errorData.message || "Failed to send email");
+        console.error("Server error:", responseBody);
+        throw new Error(
+          responseBody?.message ||
+            responseBody?.error ||
+            RESEND_ERROR_FALLBACK_MESSAGE
+        );
       }
 
       setEmailStatus("success");
@@ -610,7 +627,12 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
     } catch (error) {
       console.error("Failed to send email:", error);
       setEmailStatus("error");
-      setEmailError(error instanceof Error ? error.message : "Unknown error occurred");
+      const rawMessage = error instanceof Error ? error.message.trim() : "";
+      setEmailError(
+        rawMessage && !/failed to fetch/i.test(rawMessage)
+          ? rawMessage
+          : RESEND_ERROR_FALLBACK_MESSAGE
+      );
     } finally {
       setSendingEmail(false);
     }
@@ -1585,7 +1607,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                               <div className="text-[10px] mt-1">{emailError}</div>
                             )}
                             <div className="text-[10px] mt-1 text-red-600">
-                              Check: n8n workflow is running, webhook URL is correct, and SMTP credentials are valid
+                              {RESEND_ERROR_HINT_TEXT}
                             </div>
                           </div>
                         )}

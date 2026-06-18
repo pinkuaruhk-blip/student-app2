@@ -5,6 +5,11 @@ import { replacePlaceholders } from "@/lib/placeholders";
 import { Resend } from "resend";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_PROVIDER = "resend";
+const RESEND_GENERIC_SEND_ERROR_MESSAGE =
+  "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
+const RESEND_SUPPRESSED_RECIPIENT_MESSAGE =
+  "Resend suppressed this recipient due to a previous hard bounce, spam complaint, or suppression list entry. Please verify the recipient address and review the Resend dashboard.";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,6 +85,98 @@ function normalizeOptionalString(value: unknown): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function stringifySafeField(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function parseProviderStatus(value: unknown): number | string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalized = stringifySafeField(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsedNumber = Number(normalized);
+  if (Number.isFinite(parsedNumber)) {
+    return parsedNumber;
+  }
+
+  return normalized;
+}
+
+type ResendErrorDetails = {
+  safeShape: Record<string, string | number | undefined>;
+  providerStatus?: number | string;
+  errorCode?: string;
+  providerMessage?: string;
+  sendStatus: "failed" | "suppressed";
+  userMessage: string;
+};
+
+function parseResendError(error: unknown): ResendErrorDetails {
+  const errorObject =
+    error && typeof error === "object" ? (error as Record<string, unknown>) : {};
+
+  const providerMessage = stringifySafeField(errorObject.message);
+  const name = stringifySafeField(errorObject.name);
+  const errorCode = stringifySafeField(errorObject.code);
+  const errorType = stringifySafeField(errorObject.type);
+  const providerStatus =
+    parseProviderStatus(errorObject.statusCode) ?? parseProviderStatus(errorObject.status);
+
+  const searchableFields = [
+    providerMessage,
+    name,
+    errorCode,
+    errorType,
+    stringifySafeField(providerStatus),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const isSuppressedRecipient = [
+    "suppress",
+    "suppression",
+    "hard bounce",
+    "spam complaint",
+    "complained recipient",
+    "blocked recipient",
+  ].some((pattern) => searchableFields.includes(pattern));
+
+  return {
+    safeShape: {
+      name,
+      message: providerMessage,
+      statusCode:
+        typeof providerStatus === "number"
+          ? providerStatus
+          : stringifySafeField(providerStatus),
+      code: errorCode,
+      type: errorType,
+    },
+    providerStatus,
+    errorCode,
+    providerMessage,
+    sendStatus: isSuppressedRecipient ? "suppressed" : "failed",
+    userMessage: isSuppressedRecipient
+      ? RESEND_SUPPRESSED_RECIPIENT_MESSAGE
+      : RESEND_GENERIC_SEND_ERROR_MESSAGE,
+  };
 }
 
 function formatResendFrom(email: string, name?: string): string {
@@ -396,51 +493,31 @@ export async function POST(request: NextRequest) {
     log("Subject with card ID:", subjectWithCardId);
     log("Sending via Resend");
 
-    const resend = new Resend(RESEND_API_KEY);
-    const resendFrom = formatResendFrom(effectiveFromEmail, effectiveFromName);
-    const plainTextBody = processedBody.replace(/<[^>]*>/g, "");
-
-    const { data: resendData, error: resendError } = await resend.emails.send({
-      from: resendFrom,
-      to,
-      cc: normalizedCc,
-      bcc: normalizedBcc,
-      replyTo: effectiveFromEmail,
-      subject: subjectWithCardId,
-      html: processedBody,
-      text: plainTextBody,
-    });
-
-    if (resendError) {
-      console.error("❌ Resend error:", resendError);
-      log("❌ Resend error:", resendError.message);
-      return NextResponse.json(
-        {
-          error: "Failed to send email",
-          message: resendError.message,
-          debugLogs,
-        },
-        { status: 502 }
-      );
-    }
-
-    const resendId = resendData?.id;
-    log("✅ Resend response id:", resendId);
-
     let persisted = false;
     let persistenceReason: "card_emails_logged" | "missing_card_id" | "card_email_log_failed" =
       normalizedCardId ? "card_email_log_failed" : "missing_card_id";
 
-    // Log sent email to database if cardId is provided
-    if (normalizedCardId) {
+    const persistCardEmailAttempt = async (params: {
+      status: "sent" | "failed" | "suppressed";
+      resendId?: string;
+      bounceMessage?: string;
+    }) => {
+      if (!normalizedCardId) {
+        log(
+          "ℹ️ Skipping card_emails persistence because normalizedCardId is missing; email send attempted without DB logging"
+        );
+        persistenceReason = "missing_card_id";
+        return;
+      }
+
       try {
         const cardEmailId = id();
         const sentTimestamp = Date.now();
-        log("Saving email to database, cardId:", normalizedCardId, "emailId:", cardEmailId);
+        log("Saving email attempt to database, cardId:", normalizedCardId, "emailId:", cardEmailId);
         log("Resend delivery tracking fields:", {
-          hasResendId: Boolean(resendId),
-          status: "sent",
-          provider: "resend",
+          hasResendId: Boolean(params.resendId),
+          status: params.status,
+          provider: RESEND_PROVIDER,
         });
 
         await adminDb.transact([
@@ -453,10 +530,11 @@ export async function POST(request: NextRequest) {
             body: processedBody, // Store body with placeholders replaced
             sentAt: sentTimestamp,
             emailId,
-            resendId,
-            status: "sent",
+            resendId: params.resendId,
+            status: params.status,
             statusUpdatedAt: sentTimestamp,
-            provider: "resend",
+            bounceMessage: params.bounceMessage,
+            provider: RESEND_PROVIDER,
             read: true, // Sent emails are already "read" by the sender
             sentVia: sentVia || undefined,
           }).link({ card: normalizedCardId }),
@@ -464,8 +542,8 @@ export async function POST(request: NextRequest) {
 
         persisted = true;
         persistenceReason = "card_emails_logged";
-        log("✅ Email logged to database");
-        log("✅ Resend ID stored in card_emails:", Boolean(resendId));
+        log("✅ Email attempt logged to database");
+        log("✅ Resend ID stored in card_emails:", Boolean(params.resendId));
 
         try {
           const verificationResult = await adminDb.query({
@@ -489,16 +567,69 @@ export async function POST(request: NextRequest) {
         persisted = false;
         persistenceReason = "card_email_log_failed";
         log(
-          "⚠️ Failed to log email to database:",
+          "⚠️ Failed to log email attempt to database:",
           dbError?.message || "unknown database error"
         );
         // Don't fail the request if database logging fails
       }
-    } else {
-      log(
-        "ℹ️ Skipping card_emails persistence because normalizedCardId is missing; email send succeeded without DB logging"
+    };
+
+    const resend = new Resend(RESEND_API_KEY);
+    const resendFrom = formatResendFrom(effectiveFromEmail, effectiveFromName);
+    const plainTextBody = processedBody.replace(/<[^>]*>/g, "");
+
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: resendFrom,
+      to,
+      cc: normalizedCc,
+      bcc: normalizedBcc,
+      replyTo: effectiveFromEmail,
+      subject: subjectWithCardId,
+      html: processedBody,
+      text: plainTextBody,
+    });
+
+    if (resendError) {
+      console.error("❌ Resend error:", resendError);
+      const resendErrorDetails = parseResendError(resendError);
+      log("❌ Resend error safe shape:", resendErrorDetails.safeShape);
+
+      await persistCardEmailAttempt({
+        status: resendErrorDetails.sendStatus,
+        bounceMessage: resendErrorDetails.providerMessage || resendErrorDetails.userMessage,
+      });
+
+      const responseStatus =
+        typeof resendErrorDetails.providerStatus === "number" &&
+        resendErrorDetails.providerStatus >= 400 &&
+        resendErrorDetails.providerStatus <= 599
+          ? resendErrorDetails.providerStatus
+          : 502;
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to send email",
+          message: resendErrorDetails.userMessage,
+          provider: RESEND_PROVIDER,
+          providerStatus: resendErrorDetails.providerStatus,
+          errorCode: resendErrorDetails.errorCode,
+          sendStatus: resendErrorDetails.sendStatus,
+          persisted,
+          persistenceReason,
+          debugLogs,
+        },
+        { status: responseStatus }
       );
     }
+
+    const resendId = resendData?.id;
+    log("✅ Resend response id:", resendId);
+
+    await persistCardEmailAttempt({
+      status: "sent",
+      resendId,
+    });
 
     log("✅ Email sent successfully via Resend");
 
@@ -513,13 +644,18 @@ export async function POST(request: NextRequest) {
       persistenceReason,
       debugLogs: debugLogs, // Include debug logs in response
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Error sending email:", error);
-    debugLogs.push("❌ Error: " + error.message);
+    const safeError = parseResendError(error);
+    log("❌ Unexpected email send error safe shape:", safeError.safeShape);
     return NextResponse.json(
       {
+        success: false,
         error: "Failed to send email",
-        message: error.message,
+        message: RESEND_GENERIC_SEND_ERROR_MESSAGE,
+        provider: RESEND_PROVIDER,
+        providerStatus: safeError.providerStatus,
+        errorCode: safeError.errorCode,
         debugLogs: debugLogs,
       },
       { status: 500 }

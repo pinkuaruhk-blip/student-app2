@@ -33,6 +33,9 @@ type Stage = {
   cards: Card[];
 };
 
+const RESEND_ERROR_FALLBACK_MESSAGE =
+  "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
+
 export default function KanbanPage() {
   const t = useTranslations('pipes');
   const tCommon = useTranslations('common');
@@ -356,6 +359,8 @@ export default function KanbanPage() {
       case "bounced":
       case "failed":
         return "bg-red-100 text-red-700";
+      case "suppressed":
+        return "bg-orange-100 text-orange-700";
       case "delayed":
         return "bg-amber-100 text-amber-700";
       case "complained":
@@ -375,7 +380,12 @@ export default function KanbanPage() {
 
     const normalizedStatus = email.status?.toLowerCase();
     if (
-      (normalizedStatus === "bounced" || normalizedStatus === "failed" || normalizedStatus === "complained") &&
+      (
+        normalizedStatus === "bounced" ||
+        normalizedStatus === "failed" ||
+        normalizedStatus === "complained" ||
+        normalizedStatus === "suppressed"
+      ) &&
       email.bounceMessage
     ) {
       details.push(email.bounceMessage);
@@ -518,10 +528,14 @@ export default function KanbanPage() {
         }),
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send email");
+        throw new Error(
+          result?.message ||
+            result?.error ||
+            RESEND_ERROR_FALLBACK_MESSAGE
+        );
       }
 
       showToast("Email sent successfully!");
@@ -540,7 +554,12 @@ export default function KanbanPage() {
       setEmailComposeView('inline');
     } catch (error) {
       console.error("Error sending email:", error);
-      alert(`Failed to send email: ${error instanceof Error ? error.message : String(error)}`);
+      const rawMessage = error instanceof Error ? error.message.trim() : "";
+      const safeMessage =
+        rawMessage && !/failed to fetch/i.test(rawMessage)
+          ? rawMessage
+          : RESEND_ERROR_FALLBACK_MESSAGE;
+      alert(`Failed to send email: ${safeMessage}`);
     } finally {
       setSendingEmail(false);
     }

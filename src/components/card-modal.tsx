@@ -670,7 +670,7 @@ export function CardModal({ card, onClose }: CardModalProps) {
                     <div className="text-sm mt-1">{emailError}</div>
                   )}
                   <div className="text-xs mt-2 text-red-600">
-                    Check: n8n workflow is running, webhook URL is correct, and SMTP credentials are valid
+                    Check the recipient address and Resend dashboard for delivery details.
                   </div>
                 </div>
               )}
