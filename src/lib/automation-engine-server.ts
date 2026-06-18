@@ -8,6 +8,14 @@ import { adminDb } from "./db-admin";
 import { id as generateId } from "@instantdb/admin";
 import { processEmailTemplate, getFormLink } from "./email-templates";
 
+function maskEmail(email: string | null | undefined): string {
+  if (!email) return "(empty)";
+  const str = String(email);
+  const at = str.indexOf("@");
+  if (at <= 1) return str[0] + "***" + str.slice(at);
+  return str[0] + "***" + str.slice(at);
+}
+
 /**
  * Check if automations should be triggered and execute them
  */
@@ -600,7 +608,10 @@ async function executeSendEmailAction(
   config: { templateId: string; recipientField: string; formId?: string },
   cardId: string
 ): Promise<any> {
-  // Query card with all necessary data
+  const TAG = "[send_email:server]";
+  console.log(`${TAG} === DIAGNOSTIC START ===`);
+  console.log(`${TAG} cardId=${cardId}, templateId=${config.templateId}, recipientField=${config.recipientField ?? "(not set)"}`);
+
   const data = await adminDb.query({
     cards: {
       $: { where: { id: cardId } },
@@ -613,19 +624,24 @@ async function executeSendEmailAction(
   });
 
   const card = data?.cards?.[0];
-  if (!card) throw new Error("Card not found");
+  if (!card) {
+    console.error(`${TAG} Card NOT found for id=${cardId}`);
+    throw new Error("Card not found");
+  }
+  console.log(`${TAG} card found, title="${card.title}", fields count=${card.fields?.length ?? 0}`);
 
-  // Find the recipient field
   const recipientField = card.fields?.find(
     (f: any) => f.key === config.recipientField
   );
   const recipientEmail = recipientField?.value;
 
+  console.log(`${TAG} recipientField key="${config.recipientField}", field found=${!!recipientField}, value present=${!!recipientEmail}, masked=${maskEmail(recipientEmail)}`);
+
   if (!recipientEmail) {
+    console.error(`${TAG} Recipient field "${config.recipientField}" not found or empty — aborting`);
     throw new Error(`Recipient field "${config.recipientField}" not found or empty`);
   }
 
-  // Load email template
   const templateData = await adminDb.query({
     email_templates: {
       $: {
@@ -635,19 +651,19 @@ async function executeSendEmailAction(
   });
 
   const template = templateData?.email_templates?.[0];
-  console.log("📧 Full template object (send_email):", template);
+  console.log(`${TAG} template found=${!!template}, templateId=${config.templateId}`);
 
-  if (!template) throw new Error("Email template not found");
+  if (!template) {
+    console.error(`${TAG} Email template NOT found for templateId=${config.templateId}`);
+    throw new Error("Email template not found");
+  }
+  console.log(`${TAG} template name="${template.name}", toEmail=${maskEmail(template.toEmail)}`);
 
-  // Extract sender information from template
   const fromEmail = template.fromEmail;
   const fromName = template.fromName;
   const cc = template.cc;
   const bcc = template.bcc;
-  console.log("📧 fromEmail from template:", fromEmail);
-  console.log("📧 fromName from template:", fromName);
 
-  // Build template data
   const emailTemplateData: any = {
     card: {
       title: card.title,
@@ -662,7 +678,6 @@ async function executeSendEmailAction(
     },
   };
 
-  // If formId is specified, add form data
   if (config.formId) {
     const form = card.stage?.forms?.find((f: any) => f.id === config.formId);
     if (form) {
@@ -674,14 +689,12 @@ async function executeSendEmailAction(
     }
   }
 
-  // Process template
   const subject = processEmailTemplate(template.subject, emailTemplateData);
   const body = processEmailTemplate(template.body, emailTemplateData);
 
-  // Send email via API
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  console.log(`📧 Sending email to: ${recipientEmail}`);
-  console.log(`📧 Using API URL: ${baseUrl}/api/send-email`);
+  console.log(`${TAG} calling ${baseUrl}/api/send-email, to=${maskEmail(recipientEmail)}, subject="${subject}"`);
+  console.log(`${TAG} baseUrl source=${process.env.NEXT_PUBLIC_APP_URL ? "NEXT_PUBLIC_APP_URL" : "fallback localhost"}`);
 
   const response = await fetch(`${baseUrl}/api/send-email`, {
     method: "POST",
@@ -698,14 +711,16 @@ async function executeSendEmailAction(
     }),
   });
 
+  console.log(`${TAG} /api/send-email response status=${response.status}`);
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`❌ Send email API error:`, errorText);
+    console.error(`${TAG} /api/send-email FAILED: status=${response.status}, body=${errorText}`);
     throw new Error(`Failed to send email: ${errorText}`);
   }
 
-  const responseData = await response.json();
-  console.log(`✅ Email sent successfully:`, responseData);
+  await response.json();
+  console.log(`${TAG} === DIAGNOSTIC END (success) ===`);
 
   return {
     recipientEmail,

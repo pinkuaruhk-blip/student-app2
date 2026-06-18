@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { init, id } from "@instantdb/admin";
 
+function maskEmail(email: string | null | undefined): string {
+  if (!email) return "(empty)";
+  const str = String(email);
+  const at = str.indexOf("@");
+  if (at <= 1) return str[0] + "***" + str.slice(at);
+  return str[0] + "***" + str.slice(at);
+}
+
 // Initialize InstantDB Admin SDK
 // Force recompile - added fromName support to email templates
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || "f0827431-76de-4f51-a2c3-bae2e1558bcc";
@@ -459,16 +467,18 @@ export async function POST(request: NextRequest) {
                         log(`    🎬 Executing follow-up action: ${followAction.type}`);
 
                         if (followAction.type === "send_email") {
+                          const FTAG = "[send_email:n8n:followup]";
+                          log(`${FTAG} === DIAGNOSTIC START ===`);
                           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+                          log(`${FTAG} cardId=${cardId}, baseUrl=${baseUrl}`);
 
-                          // Fetch email template first
                           const templateId = followAction.config?.templateId;
+                          log(`${FTAG} templateId=${templateId ?? "(not set)"}, recipientField=${followAction.config?.recipientField ?? "(not set)"}`);
                           if (!templateId) {
-                            log(`    ❌ Template ID is missing`);
+                            log(`${FTAG} templateId missing — aborting`);
                             throw new Error("Template ID is required for send_email action");
                           }
 
-                          log(`    📧 Fetching email template: ${templateId}`);
                           const templateData = await db.query({
                             email_templates: {
                               $: { where: { id: templateId } },
@@ -476,54 +486,49 @@ export async function POST(request: NextRequest) {
                           });
 
                           const template = templateData?.email_templates?.[0];
+                          log(`${FTAG} template found=${!!template}`);
                           if (!template) {
-                            log(`    ❌ Email template not found: ${templateId}`);
+                            log(`${FTAG} Email template NOT found for templateId=${templateId}`);
                             throw new Error(`Email template not found: ${templateId}`);
                           }
+                          log(`${FTAG} template name="${template.name}", toEmail=${maskEmail(template.toEmail)}`);
 
-                          log(`    ✅ Template found: ${template.name}`);
-
-                          // Get the recipient email from the card field (if specified)
                           const recipientFieldKey = followAction.config?.recipientField;
-                          let recipientEmail = null;
+                          let recipientEmail: string | null = null;
+                          let recipientSource = "none";
 
                           if (recipientFieldKey) {
-                            log(`    📧 Looking for recipient email in field: ${recipientFieldKey}`);
+                            log(`${FTAG} looking for recipientField key="${recipientFieldKey}"`);
                             const recipientField = followUpCard?.fields?.find((f: any) => f.key === recipientFieldKey);
-                            recipientEmail = recipientField?.value;
-
-                            if (recipientEmail) {
-                              log(`    ✅ Found recipient email: ${recipientEmail}`);
-                            }
+                            recipientEmail = recipientField?.value ?? null;
+                            log(`${FTAG} field found=${!!recipientField}, value present=${!!recipientEmail}`);
+                            if (recipientEmail) recipientSource = `cardField:${recipientFieldKey}`;
                           }
 
-                          // Use template's toEmail if no recipient email from card field
                           if (!recipientEmail && template.toEmail) {
                             recipientEmail = template.toEmail;
-                            log(`    📧 Using template's To Email: ${recipientEmail}`);
+                            recipientSource = "template.toEmail";
                           }
 
-                          // If still no recipient email, throw error
+                          log(`${FTAG} recipientResolved=${!!recipientEmail}, source=${recipientSource}, masked=${maskEmail(recipientEmail)}`);
+
                           if (!recipientEmail) {
-                            log(`    ❌ No recipient email found`);
+                            log(`${FTAG} NO recipient email resolved — aborting`);
                             throw new Error(`No recipient email found. Either specify a recipient field in automation config or set "To Email" in the email template.`);
                           }
 
-                          // Get full card data for placeholder processing
-                          log(`    🔍 Fetching full card data for placeholders...`);
+                          log(`${FTAG} fetching full card data for placeholders...`);
                           const fullCardData = await db.query({
                             cards: {
                               $: { where: { id: cardId } },
                               fields: {},
-                              stage: {
-                                pipe: {},
-                              },
+                              stage: { pipe: {} },
                             },
                           });
 
                           const fullCard = fullCardData?.cards?.[0];
 
-                          log(`    📧 Sending email to: ${recipientEmail}`);
+                          log(`${FTAG} calling ${baseUrl}/api/send-email, to=${maskEmail(recipientEmail)}`);
 
                           const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
                             method: "POST",
@@ -541,14 +546,13 @@ export async function POST(request: NextRequest) {
                           });
 
                           const emailResponseText = await emailResponse.text();
+                          log(`${FTAG} /api/send-email response status=${emailResponse.status}`);
 
                           if (emailResponse.ok) {
-                            log(`    ✅ Follow-up email sent successfully`);
-                            console.log(`  ✅ Follow-up email sent`);
+                            log(`${FTAG} === DIAGNOSTIC END (success) ===`);
                             followUpExecuted.push(`${followAuto.name} (follow-up)`);
                           } else {
-                            log(`    ❌ Follow-up email failed: ${emailResponse.status} - ${emailResponseText}`);
-                            console.error(`  ❌ Follow-up email failed:`, emailResponse.status, emailResponseText);
+                            log(`${FTAG} /api/send-email FAILED: status=${emailResponse.status}, body=${emailResponseText}`);
                             throw new Error(`Email send failed: ${emailResponse.status} - ${emailResponseText}`);
                           }
                         } else if (followAction.type === "send_form_link") {
@@ -678,15 +682,18 @@ export async function POST(request: NextRequest) {
                   }
                 }
               } else if (action.type === "send_email") {
+                const DTAG = "[send_email:n8n:direct]";
+                console.log(`${DTAG} === DIAGNOSTIC START ===`);
                 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+                console.log(`${DTAG} cardId=${cardId}, baseUrl=${baseUrl}`);
 
-                // Fetch email template first
                 const templateId = action.config?.templateId;
+                console.log(`${DTAG} templateId=${templateId ?? "(not set)"}, recipientField=${action.config?.recipientField ?? "(not set)"}`);
                 if (!templateId) {
+                  console.error(`${DTAG} templateId missing — aborting`);
                   throw new Error("Template ID is required for send_email action");
                 }
 
-                console.log(`  📧 Fetching email template: ${templateId}`);
                 const templateData = await db.query({
                   email_templates: {
                     $: { where: { id: templateId } },
@@ -694,60 +701,55 @@ export async function POST(request: NextRequest) {
                 });
 
                 const template = templateData?.email_templates?.[0];
+                console.log(`${DTAG} template found=${!!template}`);
                 if (!template) {
+                  console.error(`${DTAG} Email template NOT found for templateId=${templateId}`);
                   throw new Error(`Email template not found: ${templateId}`);
                 }
+                console.log(`${DTAG} template name="${template.name}", toEmail=${maskEmail(template.toEmail)}`);
 
-                console.log(`  📧 Template found: ${template.name}`);
-
-                // Get the recipient email from the card field (if specified)
                 const recipientFieldKey = action.config?.recipientField;
-                let recipientEmail = null;
+                let recipientEmail: string | null = null;
+                let recipientSource = "none";
 
                 if (recipientFieldKey) {
                   const cardData = await db.query({
                     cards: {
                       $: { where: { id: cardId } },
                       fields: {},
-                      stage: {
-                        pipe: {},
-                      },
+                      stage: { pipe: {} },
                     },
                   });
 
                   const card = cardData?.cards?.[0];
                   const recipientField = card?.fields?.find((f: any) => f.key === recipientFieldKey);
-                  recipientEmail = recipientField?.value;
-
-                  if (recipientEmail) {
-                    console.log(`  📧 Found recipient email from card field: ${recipientEmail}`);
-                  }
+                  recipientEmail = recipientField?.value ?? null;
+                  console.log(`${DTAG} recipientField key="${recipientFieldKey}", field found=${!!recipientField}, value present=${!!recipientEmail}`);
+                  if (recipientEmail) recipientSource = `cardField:${recipientFieldKey}`;
                 }
 
-                // Use template's toEmail if no recipient email from card field
                 if (!recipientEmail && template.toEmail) {
                   recipientEmail = template.toEmail;
-                  console.log(`  📧 Using template's To Email: ${recipientEmail}`);
+                  recipientSource = "template.toEmail";
                 }
 
-                // If still no recipient email, throw error
+                console.log(`${DTAG} recipientResolved=${!!recipientEmail}, source=${recipientSource}, masked=${maskEmail(recipientEmail)}`);
+
                 if (!recipientEmail) {
+                  console.error(`${DTAG} NO recipient email resolved — aborting`);
                   throw new Error(`No recipient email found. Either specify a recipient field in automation config or set "To Email" in the email template.`);
                 }
 
-                // Get full card data for placeholder processing
                 const cardData = await db.query({
                   cards: {
                     $: { where: { id: cardId } },
                     fields: {},
-                    stage: {
-                      pipe: {},
-                    },
+                    stage: { pipe: {} },
                   },
                 });
                 const card = cardData?.cards?.[0];
 
-                console.log(`  📧 Sending email to: ${recipientEmail}`);
+                console.log(`${DTAG} calling ${baseUrl}/api/send-email, to=${maskEmail(recipientEmail)}`);
 
                 const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
                   method: "POST",
@@ -764,11 +766,14 @@ export async function POST(request: NextRequest) {
                   }),
                 });
 
+                console.log(`${DTAG} /api/send-email response status=${emailResponse.status}`);
+
                 if (!emailResponse.ok) {
                   const errorText = await emailResponse.text();
+                  console.error(`${DTAG} /api/send-email FAILED: status=${emailResponse.status}, body=${errorText}`);
                   throw new Error(`Email send failed: ${errorText}`);
                 }
-                console.log(`  ✅ Email sent`);
+                console.log(`${DTAG} === DIAGNOSTIC END (success) ===`);
               }
             }
 

@@ -715,8 +715,12 @@ export default function KanbanPage() {
       });
 
       console.log("✅ Automation executed:", automationResult);
+      if (automationResult.automationsFailed?.length > 0) {
+        console.error("[automation:newCard] Failed automations:", automationResult.automationsFailed);
+        console.error("[automation:newCard] Details:", JSON.stringify(automationResult.details, null, 2));
+      }
     } catch (error) {
-      console.error("❌ Error triggering automations:", error);
+      console.error("[automation:newCard] Error triggering automations:", error instanceof Error ? { message: error.message, stack: error.stack } : error);
     }
   };
 
@@ -784,9 +788,12 @@ export default function KanbanPage() {
       if (automationResult.details && automationResult.details.length > 0) {
         console.log("📝 Details:", automationResult.details);
       }
+      if (automationResult.automationsFailed?.length > 0) {
+        console.error("[automation:dragEnd] Failed automations:", automationResult.automationsFailed);
+        console.error("[automation:dragEnd] Details:", JSON.stringify(automationResult.details, null, 2));
+      }
     } catch (error) {
-      console.error("❌ Error triggering automations:", error);
-      // Don't fail the card move if automation fails
+      console.error("[automation:dragEnd] Error triggering automations:", error instanceof Error ? { message: error.message, stack: error.stack } : error);
     }
 
     // Optionally send event to API for n8n integration
