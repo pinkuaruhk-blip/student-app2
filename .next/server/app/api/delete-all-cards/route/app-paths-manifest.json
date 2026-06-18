@@ -1,0 +1,3 @@
+{
+  "/api/delete-all-cards/route": "app/api/delete-all-cards/route.js"
+}

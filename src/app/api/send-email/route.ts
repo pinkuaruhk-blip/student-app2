@@ -2,15 +2,50 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 import { replacePlaceholders } from "@/lib/placeholders";
+import { Resend } from "resend";
 
-const N8N_EMAIL_URL = process.env.N8N_EMAIL_URL;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value: string): boolean {
+  return emailRegex.test(value);
+}
+
+function formatResendFrom(email: string, name?: string): string {
+  if (!name) return email;
+  const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${safeName}" <${email}>`;
+}
+
+function resolveEffectiveSender(
+  from: string | undefined,
+  fromName: string | undefined,
+  defaultFromEmail: string,
+  defaultFromName: string | undefined
+): { effectiveFromEmail: string; effectiveFromName: string | undefined } {
+  const useDefault =
+    !from ||
+    from === "system" ||
+    !isValidEmail(from);
+
+  if (useDefault) {
+    return {
+      effectiveFromEmail: defaultFromEmail,
+      effectiveFromName: fromName || defaultFromName,
+    };
+  }
+
+  return {
+    effectiveFromEmail: from,
+    effectiveFromName: fromName || defaultFromName,
+  };
+}
 
 /**
  * POST /api/send-email
  *
- * Sends email data to n8n for actual email delivery
- * n8n handles the SMTP/email service integration
- * Also logs the email to the database for tracking
+ * Sends email via Resend and logs the email to the database for tracking
  */
 export async function POST(request: NextRequest) {
   const debugLogs: string[] = [];
@@ -43,20 +78,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to)) {
+    if (!isValidEmail(to)) {
       return NextResponse.json(
         { error: "Invalid email address format", email: to },
         { status: 400 }
       );
     }
 
-    if (!N8N_EMAIL_URL) {
+    if (!RESEND_API_KEY) {
       return NextResponse.json(
         {
           error: "Email service not configured",
-          message: "Please set N8N_EMAIL_URL in .env.local to enable email sending",
-          hint: "Set up an n8n workflow with webhook trigger to handle email sending"
+          message: "Please set RESEND_API_KEY to enable email sending",
+          debugLogs,
         },
         { status: 503 }
       );
@@ -74,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get email configuration from database first, then fall back to environment variables
-    let defaultFromEmail = process.env.DEFAULT_FROM_EMAIL || "system";
+    let defaultFromEmail = process.env.DEFAULT_FROM_EMAIL || "";
     let defaultFromName = process.env.DEFAULT_FROM_NAME || undefined;
 
     // Use database values if available, otherwise fall back to env vars
@@ -82,7 +116,7 @@ export async function POST(request: NextRequest) {
       defaultFromEmail = systemSettingsData.defaultFromEmail;
       log("Using defaultFromEmail from database:", defaultFromEmail);
     } else {
-      log("Using defaultFromEmail from env:", defaultFromEmail);
+      log("Using defaultFromEmail from env:", defaultFromEmail || "(none)");
     }
 
     if (systemSettingsData?.defaultFromName) {
@@ -92,9 +126,23 @@ export async function POST(request: NextRequest) {
       log("Using defaultFromName from env:", defaultFromName || "(none)");
     }
 
-    // Apply sender fallback hierarchy: template > database/system defaults > env vars
-    const effectiveFromEmail = from || defaultFromEmail;
-    const effectiveFromName = fromName || defaultFromName;
+    if (!defaultFromEmail || !isValidEmail(defaultFromEmail)) {
+      return NextResponse.json(
+        {
+          error: "Email service not configured",
+          message: "Please set DEFAULT_FROM_EMAIL to a valid sender address",
+          debugLogs,
+        },
+        { status: 503 }
+      );
+    }
+
+    const { effectiveFromEmail, effectiveFromName } = resolveEffectiveSender(
+      from,
+      fromName,
+      defaultFromEmail,
+      defaultFromName
+    );
 
     log("Effective From:", effectiveFromEmail);
     log("Effective From Name:", effectiveFromName || "(none)");
@@ -231,62 +279,37 @@ export async function POST(request: NextRequest) {
     const subjectWithCardId = cardId ? `${processedSubject} [#${cardId}]` : processedSubject;
 
     log("Subject with card ID:", subjectWithCardId);
-    log("Sending to n8n:", N8N_EMAIL_URL);
+    log("Sending via Resend");
 
-    // Send to n8n for actual email delivery
-    let response;
-    try {
-      response = await fetch(N8N_EMAIL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to,
-          from: effectiveFromEmail,
-          fromName: effectiveFromName,
-          replyTo: effectiveFromEmail, // Use from as reply-to address
-          cc: cc || undefined, // Include CC if provided
-          bcc: bcc || undefined, // Include BCC if provided
-          subject: subjectWithCardId, // Use subject with card ID and placeholders replaced
-          body: processedBody, // Use body with placeholders replaced
-          html: processedBody, // Include HTML field for email clients
-          text: processedBody.replace(/<[^>]*>/g, ""), // Strip HTML for plain text version
-          isHtml: true, // Flag to indicate HTML content
-          cardId,
-          cardData,
-          emailId, // Include email ID for tracking
-          timestamp: Date.now(),
-        }),
-      });
-    } catch (fetchError: any) {
-      log("❌ Failed to reach n8n:", fetchError.message);
+    const resend = new Resend(RESEND_API_KEY);
+    const resendFrom = formatResendFrom(effectiveFromEmail, effectiveFromName);
+    const plainTextBody = processedBody.replace(/<[^>]*>/g, "");
+
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: resendFrom,
+      to,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      replyTo: effectiveFromEmail,
+      subject: subjectWithCardId,
+      html: processedBody,
+      text: plainTextBody,
+    });
+
+    if (resendError) {
+      console.error("❌ Resend error:", resendError);
+      log("❌ Resend error:", resendError.message);
       return NextResponse.json(
         {
-          error: "Cannot connect to n8n",
-          message: "Failed to reach n8n webhook. Is n8n running?",
-          details: fetchError.message,
-          n8nUrl: N8N_EMAIL_URL,
-          debugLogs: debugLogs,
+          error: "Failed to send email",
+          message: resendError.message,
+          debugLogs,
         },
-        { status: 503 }
+        { status: 502 }
       );
     }
 
-    log("n8n response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      log("❌ n8n error response:", errorText);
-      return NextResponse.json(
-        {
-          error: "n8n webhook error",
-          message: `n8n returned ${response.status}: ${response.statusText}`,
-          details: errorText,
-          n8nUrl: N8N_EMAIL_URL,
-          debugLogs: debugLogs,
-        },
-        { status: response.status }
-      );
-    }
+    log("✅ Resend response id:", resendData?.id);
 
     // Log sent email to database if cardId is provided
     if (cardId) {
@@ -316,7 +339,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    log("✅ Email sent successfully via n8n");
+    log("✅ Email sent successfully via Resend");
 
     return NextResponse.json({
       success: true,
@@ -324,6 +347,7 @@ export async function POST(request: NextRequest) {
       to,
       subject: processedSubject, // Return processed subject (without card ID)
       emailId,
+      resendId: resendData?.id,
       debugLogs: debugLogs, // Include debug logs in response
     });
   } catch (error: any) {
@@ -332,8 +356,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to send email",
-        details: error.message,
-        hint: "Check n8n workflow is running and N8N_EMAIL_URL is correct",
+        message: error.message,
         debugLogs: debugLogs,
       },
       { status: 500 }
@@ -343,11 +366,13 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for documentation
 export async function GET() {
+  const defaultFromEmail = process.env.DEFAULT_FROM_EMAIL;
   return NextResponse.json({
     message: "Send Email API Endpoint",
     method: "POST",
     configured: {
-      n8nEmailUrl: N8N_EMAIL_URL ? "✓ Configured" : "✗ Not configured",
+      resendApiKey: RESEND_API_KEY ? "✓ Configured" : "✗ Not configured",
+      defaultFromEmail: defaultFromEmail ? "✓ Configured" : "✗ Not configured",
     },
     usage: {
       url: "/api/send-email",
@@ -360,11 +385,10 @@ export async function GET() {
       },
     },
     instructions: [
-      "1. Create an n8n workflow with Webhook trigger",
-      "2. Add Email node (Gmail, SMTP, etc.) in n8n",
-      "3. Set N8N_EMAIL_URL in .env.local to your n8n webhook URL",
-      "4. Restart the app",
-      "5. Send emails from cards using templates"
+      "1. Set RESEND_API_KEY in your environment",
+      "2. Set DEFAULT_FROM_EMAIL to a verified Resend sender address",
+      "3. Optionally set DEFAULT_FROM_NAME for the sender display name",
+      "4. Send emails from cards using templates",
     ],
   });
 }
