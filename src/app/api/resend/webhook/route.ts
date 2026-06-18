@@ -10,17 +10,39 @@ const SUPPORTED_EVENTS = [
   "email.delivery_delayed",
   "email.bounced",
   "email.failed",
+  "email.suppressed",
   "email.complained",
 ] as const;
 
 type SupportedEventType = (typeof SUPPORTED_EVENTS)[number];
-type DeliveryStatus = "sent" | "delivered" | "delayed" | "bounced" | "failed" | "complained";
+type DeliveryStatus =
+  | "sent"
+  | "delivered"
+  | "delayed"
+  | "failed"
+  | "bounced"
+  | "suppressed"
+  | "complained";
 
 type ResendWebhookEvent = {
   type: string;
   created_at?: string | number | null;
   data?: {
     email_id?: string | null;
+    reason?: string | null;
+    message?: string | null;
+    error?:
+      | string
+      | {
+          message?: string | null;
+        }
+      | null;
+    suppression?: {
+      reason?: string | null;
+      type?: string | null;
+      message?: string | null;
+      description?: string | null;
+    } | null;
     bounce?: {
       type?: string | null;
       subType?: string | null;
@@ -44,6 +66,7 @@ const EVENT_STATUS_MAP: Record<SupportedEventType, DeliveryStatus> = {
   "email.delivery_delayed": "delayed",
   "email.bounced": "bounced",
   "email.failed": "failed",
+  "email.suppressed": "suppressed",
   "email.complained": "complained",
 };
 
@@ -53,7 +76,8 @@ const STATUS_PRECEDENCE: Record<DeliveryStatus, number> = {
   delivered: 3,
   failed: 4,
   bounced: 5,
-  complained: 6,
+  suppressed: 6,
+  complained: 7,
 };
 
 function isSupportedEventType(value: string): value is SupportedEventType {
@@ -86,6 +110,46 @@ function shouldUpdateStatus(currentStatus: string | undefined, nextStatus: Deliv
     : 0;
   const nextPrecedence = STATUS_PRECEDENCE[nextStatus];
   return nextPrecedence >= currentPrecedence;
+}
+
+function normalizeMetadataText(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  // Keep metadata short and safe for UI/logging surfaces.
+  return trimmed.slice(0, 500);
+}
+
+function getSuppressionMetadata(eventData: ResendWebhookEvent["data"]): {
+  suppressionType?: string;
+  suppressionMessage: string;
+} {
+  const suppressionType = normalizeMetadataText(
+    eventData?.suppression?.reason
+      ?? eventData?.suppression?.type
+      ?? eventData?.reason
+      ?? eventData?.bounce?.type
+      ?? eventData?.bounce?.subType
+  );
+
+  const suppressionMessage = normalizeMetadataText(
+    eventData?.suppression?.message
+      ?? eventData?.suppression?.description
+      ?? eventData?.message
+      ?? (typeof eventData?.error === "string" ? eventData.error : eventData?.error?.message)
+      ?? eventData?.bounce?.message
+  ) ?? "Email suppressed by Resend.";
+
+  return {
+    suppressionType,
+    suppressionMessage,
+  };
 }
 
 /**
@@ -167,8 +231,14 @@ export async function POST(request: NextRequest) {
 
   const statusFromEvent = EVENT_STATUS_MAP[eventType];
   const statusUpdatedAt = parseEventTimestamp(event.created_at) ?? Date.now();
-  const bounceType = event.data?.bounce?.type?.trim() || event.data?.bounce?.subType?.trim() || undefined;
-  const bounceMessage = event.data?.bounce?.message?.trim() || undefined;
+  const isSuppressedEvent = statusFromEvent === "suppressed";
+  const suppressionMetadata = isSuppressedEvent ? getSuppressionMetadata(event.data) : null;
+  const bounceType = isSuppressedEvent
+    ? suppressionMetadata?.suppressionType
+    : normalizeMetadataText(event.data?.bounce?.type) || normalizeMetadataText(event.data?.bounce?.subType);
+  const bounceMessage = isSuppressedEvent
+    ? suppressionMetadata?.suppressionMessage
+    : normalizeMetadataText(event.data?.bounce?.message);
 
   try {
     const result = await adminDb.query({
@@ -202,6 +272,9 @@ export async function POST(request: NextRequest) {
 
     const currentStatus = matchingEmail.status;
     const canApplyTransition = shouldUpdateStatus(currentStatus, statusFromEvent);
+    const hasNewBounceType = Boolean(bounceType && bounceType !== matchingEmail.bounceType);
+    const hasNewBounceMessage = Boolean(bounceMessage && bounceMessage !== matchingEmail.bounceMessage);
+    const hasMetadataUpdate = hasNewBounceType || hasNewBounceMessage;
 
     console.log("[Resend webhook] Status transition check", {
       resendEmailId,
@@ -213,6 +286,21 @@ export async function POST(request: NextRequest) {
     });
 
     if (!canApplyTransition) {
+      return NextResponse.json({
+        received: true,
+        eventType,
+        updated: false,
+      });
+    }
+
+    if (currentStatus === statusFromEvent && !hasMetadataUpdate) {
+      console.log("[Resend webhook] Duplicate status event ignored", {
+        resendEmailId,
+        cardEmailId: matchingEmail.id,
+        eventType,
+        status: statusFromEvent,
+      });
+
       return NextResponse.json({
         received: true,
         eventType,
