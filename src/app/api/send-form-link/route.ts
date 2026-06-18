@@ -1,8 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value: string): boolean {
+  return emailRegex.test(value);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatResendFrom(email: string, name?: string): string {
+  if (!name) return email;
+  const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${safeName}" <${email}>`;
+}
+
+function resolveEffectiveSender(
+  from: string | undefined,
+  fromName: string | undefined,
+  defaultFromEmail: string,
+  defaultFromName: string | undefined
+): { effectiveFromEmail: string; effectiveFromName: string | undefined } {
+  const normalizedFrom = from?.trim();
+  const useDefault =
+    !normalizedFrom ||
+    normalizedFrom.toLowerCase() === "system" ||
+    !isValidEmail(normalizedFrom);
+
+  if (useDefault) {
+    return {
+      effectiveFromEmail: defaultFromEmail,
+      effectiveFromName: fromName || defaultFromName,
+    };
+  }
+
+  return {
+    effectiveFromEmail: normalizedFrom,
+    effectiveFromName: fromName || defaultFromName,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { cardId, formId, recipientEmail, formName, cardTitle } = await request.json();
+    const { cardId, formId, recipientEmail, formName, cardTitle, from, fromName } =
+      await request.json();
 
     if (!cardId || !formId || !recipientEmail) {
       return NextResponse.json(
@@ -25,15 +75,37 @@ export async function POST(request: NextRequest) {
 
     console.log("Base URL for form link:", baseUrl);
 
-    // Send email via n8n
-    const n8nWebhookUrl = process.env.N8N_SEND_EMAIL_WEBHOOK_URL;
-
-    if (!n8nWebhookUrl) {
+    if (!RESEND_API_KEY) {
       return NextResponse.json(
-        { error: "N8N_SEND_EMAIL_WEBHOOK_URL not configured" },
-        { status: 500 }
+        {
+          error: "Email service not configured",
+          message: "Please set RESEND_API_KEY to enable email sending",
+        },
+        { status: 503 }
       );
     }
+
+    const defaultFromEmail = process.env.DEFAULT_FROM_EMAIL || "";
+    const defaultFromName = process.env.DEFAULT_FROM_NAME || undefined;
+
+    if (!defaultFromEmail || !isValidEmail(defaultFromEmail)) {
+      return NextResponse.json(
+        {
+          error: "Email service not configured",
+          message: "Please set DEFAULT_FROM_EMAIL to a valid sender address",
+        },
+        { status: 503 }
+      );
+    }
+
+    const { effectiveFromEmail, effectiveFromName } = resolveEffectiveSender(
+      from,
+      fromName,
+      defaultFromEmail,
+      defaultFromName
+    );
+
+    const resendFrom = formatResendFrom(effectiveFromEmail, effectiveFromName);
 
     const emailBody = `Hello,
 
@@ -48,25 +120,34 @@ Thank you for your cooperation!
 Best regards,
 Your Team`;
 
-    const emailPayload = {
+    const emailSubject = `Action Required: ${formName || "Please Fill Out This Form"} - ${cardTitle || ""}`;
+
+    const emailHtml = `<div>${escapeHtml(emailBody).replace(/\n/g, "<br />")}</div>`;
+
+    const resend = new Resend(RESEND_API_KEY);
+    console.log("Sending form link email via Resend:", {
       to: recipientEmail,
-      subject: `Action Required: ${formName || "Please Fill Out This Form"} - ${cardTitle || ""}`,
-      body: emailBody,
+      subject: emailSubject,
       cardId,
-    };
-
-    console.log("Sending form link email via n8n:", emailPayload);
-
-    const response = await fetch(n8nWebhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(emailPayload),
     });
 
-    if (!response.ok) {
-      throw new Error(`n8n webhook failed: ${response.statusText}`);
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: resendFrom,
+      to: recipientEmail,
+      subject: emailSubject,
+      html: emailHtml,
+      text: emailBody,
+    });
+
+    if (resendError) {
+      console.error("❌ Resend error:", resendError);
+      return NextResponse.json(
+        {
+          error: "Failed to send form link",
+          details: resendError.message,
+        },
+        { status: 500 }
+      );
     }
 
     console.log("✅ Form link email sent successfully");
@@ -75,6 +156,7 @@ Your Team`;
       success: true,
       message: "Form link sent via email",
       formLink,
+      resendId: resendData?.id,
     });
   } catch (error: any) {
     console.error("❌ Error sending form link:", error);
