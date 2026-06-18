@@ -73,6 +73,15 @@ function normalizeRecipientField(value: RecipientFieldInput): string[] | undefin
   return normalizedRecipients.length > 0 ? normalizedRecipients : undefined;
 }
 
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function formatResendFrom(email: string, name?: string): string {
   if (!name) return email;
   const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -116,7 +125,26 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const { to, from, fromName, subject, body, cardId, cardData, cc, bcc, sentVia } = await request.json();
+    const parsedRequestBody = await request.json();
+    const requestBody =
+      parsedRequestBody && typeof parsedRequestBody === "object"
+        ? (parsedRequestBody as Record<string, any>)
+        : {};
+
+    const {
+      to,
+      from,
+      fromName,
+      subject,
+      body,
+      cardData,
+      cc,
+      bcc,
+      sentVia,
+    } = requestBody;
+    const hasRawCardIdKey = Object.prototype.hasOwnProperty.call(requestBody, "cardId");
+    const rawCardId = requestBody.cardId;
+    const normalizedCardId = normalizeOptionalString(rawCardId);
 
     log("=== Send Email Request ===");
     log("To:", to);
@@ -124,7 +152,11 @@ export async function POST(request: NextRequest) {
     log("CC:", cc || "none");
     log("BCC:", bcc || "none");
     log("Subject:", subject);
-    log("Card ID:", cardId);
+    log("Card ID:", rawCardId);
+    log("cardId key present in request body:", hasRawCardIdKey);
+    log("cardId value type:", rawCardId === null ? "null" : typeof rawCardId);
+    log("normalizedCardId present:", Boolean(normalizedCardId));
+    log("Normalized Card ID:", normalizedCardId || "(none)");
     log("========================");
 
     // Validate required fields
@@ -253,7 +285,7 @@ export async function POST(request: NextRequest) {
     if (cardData) {
       // Fetch form submissions for this card to support form placeholders
       let formSubmissions: any[] = [];
-      if (cardId) {
+      if (normalizedCardId) {
         try {
           const { init } = await import("@instantdb/admin");
           const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
@@ -267,7 +299,7 @@ export async function POST(request: NextRequest) {
           // Query from card side to get form submissions via relationship
           const cardWithSubmissions = await db.query({
             cards: {
-              $: { where: { id: cardId } },
+              $: { where: { id: normalizedCardId } },
               form_submissions: {
                 form: {},
               },
@@ -300,7 +332,7 @@ export async function POST(request: NextRequest) {
             };
           });
 
-          log(`Found ${formSubmissions.length} form submissions for card ${cardId}`);
+          log(`Found ${formSubmissions.length} form submissions for card ${normalizedCardId}`);
           formSubmissions.forEach((sub, index) => {
             log(`  Submission ${index + 1}:`, {
               formId: sub.form?.id,
@@ -357,7 +389,9 @@ export async function POST(request: NextRequest) {
 
     // Add card ID to subject for reply matching (if cardId is provided)
     // Format: "Original Subject [#cardId]"
-    const subjectWithCardId = cardId ? `${processedSubject} [#${cardId}]` : processedSubject;
+    const subjectWithCardId = normalizedCardId
+      ? `${processedSubject} [#${normalizedCardId}]`
+      : processedSubject;
 
     log("Subject with card ID:", subjectWithCardId);
     log("Sending via Resend");
@@ -393,12 +427,16 @@ export async function POST(request: NextRequest) {
     const resendId = resendData?.id;
     log("✅ Resend response id:", resendId);
 
+    let persisted = false;
+    let persistenceReason: "card_emails_logged" | "missing_card_id" | "card_email_log_failed" =
+      normalizedCardId ? "card_email_log_failed" : "missing_card_id";
+
     // Log sent email to database if cardId is provided
-    if (cardId) {
+    if (normalizedCardId) {
       try {
         const cardEmailId = id();
         const sentTimestamp = Date.now();
-        log("Saving email to database, cardId:", cardId, "emailId:", cardEmailId);
+        log("Saving email to database, cardId:", normalizedCardId, "emailId:", cardEmailId);
         log("Resend delivery tracking fields:", {
           hasResendId: Boolean(resendId),
           status: "sent",
@@ -421,15 +459,45 @@ export async function POST(request: NextRequest) {
             provider: "resend",
             read: true, // Sent emails are already "read" by the sender
             sentVia: sentVia || undefined,
-          }).link({ card: cardId }),
+          }).link({ card: normalizedCardId }),
         ]);
 
+        persisted = true;
+        persistenceReason = "card_emails_logged";
         log("✅ Email logged to database");
         log("✅ Resend ID stored in card_emails:", Boolean(resendId));
+
+        try {
+          const verificationResult = await adminDb.query({
+            card_emails: {
+              $: {
+                where: {
+                  id: cardEmailId,
+                },
+              },
+            },
+          });
+          const verificationFound = Boolean(verificationResult?.card_emails?.[0]);
+          log("Post-write verification card_emails found:", verificationFound);
+        } catch (verificationError: any) {
+          log(
+            "⚠️ card_emails verification query failed:",
+            verificationError?.message || "unknown verification error"
+          );
+        }
       } catch (dbError: any) {
-        log("⚠️ Failed to log email to database:", dbError.message);
+        persisted = false;
+        persistenceReason = "card_email_log_failed";
+        log(
+          "⚠️ Failed to log email to database:",
+          dbError?.message || "unknown database error"
+        );
         // Don't fail the request if database logging fails
       }
+    } else {
+      log(
+        "ℹ️ Skipping card_emails persistence because normalizedCardId is missing; email send succeeded without DB logging"
+      );
     }
 
     log("✅ Email sent successfully via Resend");
@@ -441,6 +509,8 @@ export async function POST(request: NextRequest) {
       subject: processedSubject, // Return processed subject (without card ID)
       emailId,
       resendId,
+      persisted,
+      persistenceReason,
       debugLogs: debugLogs, // Include debug logs in response
     });
   } catch (error: any) {
