@@ -390,13 +390,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    log("✅ Resend response id:", resendData?.id);
+    const resendId = resendData?.id;
+    log("✅ Resend response id:", resendId);
 
     // Log sent email to database if cardId is provided
     if (cardId) {
       try {
         const cardEmailId = id();
+        const sentTimestamp = Date.now();
         log("Saving email to database, cardId:", cardId, "emailId:", cardEmailId);
+        log("Resend delivery tracking fields:", {
+          hasResendId: Boolean(resendId),
+          status: "sent",
+          provider: "resend",
+        });
 
         await adminDb.transact([
           adminDb.tx.card_emails[cardEmailId].update({
@@ -406,14 +413,19 @@ export async function POST(request: NextRequest) {
             cc: normalizedCc?.join(", "),
             subject: subjectWithCardId, // Store subject with card ID and placeholders replaced
             body: processedBody, // Store body with placeholders replaced
-            sentAt: Date.now(),
+            sentAt: sentTimestamp,
             emailId,
+            resendId,
+            status: "sent",
+            statusUpdatedAt: sentTimestamp,
+            provider: "resend",
             read: true, // Sent emails are already "read" by the sender
             sentVia: sentVia || undefined,
           }).link({ card: cardId }),
         ]);
 
         log("✅ Email logged to database");
+        log("✅ Resend ID stored in card_emails:", Boolean(resendId));
       } catch (dbError: any) {
         log("⚠️ Failed to log email to database:", dbError.message);
         // Don't fail the request if database logging fails
@@ -428,7 +440,7 @@ export async function POST(request: NextRequest) {
       to,
       subject: processedSubject, // Return processed subject (without card ID)
       emailId,
-      resendId: resendData?.id,
+      resendId,
       debugLogs: debugLogs, // Include debug logs in response
     });
   } catch (error: any) {

@@ -52,6 +52,12 @@ const schema = i.schema({
       body: i.string(),
       sentAt: i.number().indexed(), // Timestamp, indexed for sorting
       emailId: i.string().optional(), // External email ID for tracking replies
+      resendId: i.string().optional(), // Resend message ID for provider-side tracking
+      status: i.string().optional(), // Delivery status from provider, e.g. "sent", "delivered", "bounced"
+      statusUpdatedAt: i.number().optional(), // Timestamp of latest status update
+      bounceType: i.string().optional(), // Bounce classification from provider (when available)
+      bounceMessage: i.string().optional(), // Bounce detail message from provider (when available)
+      provider: i.string().optional(), // Email provider used to send this email (e.g. "resend")
       inReplyTo: i.string().optional(), // Reference to original email ID
       read: i.boolean().optional(), // Whether the email has been read (true for sent, false/true for received)
       sentVia: i.string().optional(), // How the email was sent: "automation" or undefined for manual
