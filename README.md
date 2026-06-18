@@ -1,6 +1,6 @@
 # FlowLane: Kanban Board with InstantDB
 
-A lightweight workflow app built with Next.js, InstantDB, and n8n automations. Features real-time collaboration, custom fields, form integration, and email automation.
+A lightweight workflow app built with Next.js, InstantDB, Resend, and n8n automations. Features real-time collaboration, custom fields, form integration, and email automation.
 
 ## Features
 
@@ -9,7 +9,7 @@ A lightweight workflow app built with Next.js, InstantDB, and n8n automations. F
 - ✅ **Custom Fields**: Add custom fields to cards (text, number, date, select, file)
 - ✅ **Magic Link Auth**: Passwordless authentication via email
 - ✅ **Form Integration**: Formbricks webhook integration to create cards from forms
-- ✅ **Email Automation**: n8n workflows for email inbox monitoring and notifications
+- ✅ **Email Automation**: Resend-powered outbound email with optional n8n inbound/reply workflows
 - ✅ **Real-time Sync**: InstantDB provides instant updates across all clients
 - ✅ **Owner-only Access**: Secure permissions with single-user setup
 
@@ -26,7 +26,7 @@ A lightweight workflow app built with Next.js, InstantDB, and n8n automations. F
 
 - Node.js 20+ and npm
 - InstantDB account (free tier available)
-- n8n instance (optional, for automations)
+- n8n instance (optional, for automations and inbound email processing)
 - Formbricks account (optional, for form integration)
 
 ## Quick Start
