@@ -12,6 +12,67 @@ function isValidEmail(value: string): boolean {
   return emailRegex.test(value);
 }
 
+type RecipientFieldInput = string | string[] | null | undefined;
+
+function splitRecipientEntries(value: string): string[] {
+  const entries: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let angleBracketDepth = 0;
+
+  for (const char of value) {
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      current += char;
+      continue;
+    }
+
+    if (!inQuotes) {
+      if (char === "<") {
+        angleBracketDepth += 1;
+      } else if (char === ">") {
+        angleBracketDepth = Math.max(0, angleBracketDepth - 1);
+      }
+
+      if ((char === "," || char === ";") && angleBracketDepth === 0) {
+        entries.push(current);
+        current = "";
+        continue;
+      }
+    }
+
+    current += char;
+  }
+
+  entries.push(current);
+  return entries;
+}
+
+function getRecipientEmailAddress(recipient: string): string {
+  const displayNameMatch = recipient.match(/^.*<([^<>]+)>\s*$/);
+  return displayNameMatch ? displayNameMatch[1].trim() : recipient;
+}
+
+function isValidRecipientAddress(recipient: string): boolean {
+  const emailAddress = getRecipientEmailAddress(recipient.trim());
+  return isValidEmail(emailAddress);
+}
+
+function normalizeRecipientField(value: RecipientFieldInput): string[] | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  const rawValues = Array.isArray(value) ? value : [value];
+  const normalizedRecipients = rawValues
+    .filter((entry): entry is string => typeof entry === "string")
+    .flatMap((entry) => splitRecipientEntries(entry))
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  return normalizedRecipients.length > 0 ? normalizedRecipients : undefined;
+}
+
 function formatResendFrom(email: string, name?: string): string {
   if (!name) return email;
   const safeName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -84,6 +145,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const normalizedCc = normalizeRecipientField(cc);
+    const normalizedBcc = normalizeRecipientField(bcc);
+
+    if (normalizedCc?.some((recipient) => !isValidRecipientAddress(recipient))) {
+      return NextResponse.json(
+        { error: "Invalid cc email address" },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedBcc?.some((recipient) => !isValidRecipientAddress(recipient))) {
+      return NextResponse.json(
+        { error: "Invalid bcc email address" },
+        { status: 400 }
+      );
+    }
+
+    log("Normalized CC:", normalizedCc || "none");
+    log("Normalized BCC:", normalizedBcc || "none");
 
     if (!RESEND_API_KEY) {
       return NextResponse.json(
@@ -288,8 +369,8 @@ export async function POST(request: NextRequest) {
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: resendFrom,
       to,
-      cc: cc || undefined,
-      bcc: bcc || undefined,
+      cc: normalizedCc,
+      bcc: normalizedBcc,
       replyTo: effectiveFromEmail,
       subject: subjectWithCardId,
       html: processedBody,
@@ -322,7 +403,7 @@ export async function POST(request: NextRequest) {
             direction: "sent",
             from: formattedFrom,
             to,
-            cc: cc || undefined,
+            cc: normalizedCc?.join(", "),
             subject: subjectWithCardId, // Store subject with card ID and placeholders replaced
             body: processedBody, // Store body with placeholders replaced
             sentAt: Date.now(),
