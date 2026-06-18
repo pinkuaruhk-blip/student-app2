@@ -349,6 +349,41 @@ export default function KanbanPage() {
     }
   };
 
+  const getEmailDeliveryStatusBadgeClass = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "delivered":
+        return "bg-green-100 text-green-700";
+      case "bounced":
+      case "failed":
+        return "bg-red-100 text-red-700";
+      case "delayed":
+        return "bg-amber-100 text-amber-700";
+      case "complained":
+        return "bg-orange-100 text-orange-700";
+      case "sent":
+        return "bg-blue-100 text-blue-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getEmailDeliveryStatusTitle = (email: any) => {
+    const details: string[] = [];
+    if (email.statusUpdatedAt) {
+      details.push(`Updated: ${new Date(email.statusUpdatedAt).toLocaleString()}`);
+    }
+
+    const normalizedStatus = email.status?.toLowerCase();
+    if (
+      (normalizedStatus === "bounced" || normalizedStatus === "failed" || normalizedStatus === "complained") &&
+      email.bounceMessage
+    ) {
+      details.push(email.bounceMessage);
+    }
+
+    return details.length > 0 ? details.join(" | ") : undefined;
+  };
+
   const stripHtml = (html: string) => {
     if (typeof window === 'undefined') return html;
     const temp = document.createElement("div");
@@ -1993,6 +2028,14 @@ export default function KanbanPage() {
                                 }`}>
                                   {email.direction === "sent" ? "Sent" : "Received"}
                                 </span>
+                                {email.direction === "sent" && email.status && (
+                                  <span
+                                    className={`px-2 py-0.5 text-[10px] rounded ${getEmailDeliveryStatusBadgeClass(email.status)}`}
+                                    title={getEmailDeliveryStatusTitle(email)}
+                                  >
+                                    {email.status}
+                                  </span>
+                                )}
                                 <span className="text-[10px] text-gray-500">
                                   {formatDate(email.sentAt)}
                                 </span>
