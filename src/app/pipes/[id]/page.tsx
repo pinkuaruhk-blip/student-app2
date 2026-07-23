@@ -259,162 +259,32 @@ export default function KanbanPage() {
     })
   );
 
-  // TEMPORARY DIAGNOSTIC — REMOVE AFTER INVESTIGATION
-  // ?debugBoardQuery=minimal|cardsOnly|fieldsOnly|fieldsNoRender|fieldsNoCardsRender
-  //                  |fullNoRender|noFields|noEmails|noFormSubmissions|noEmailTemplates|full
-  // When absent, uses the full production query unchanged.
-  const debugBoardQuery = searchParams.get("debugBoardQuery");
-
-  // TEMPORARY — render cycle counter for lifecycle tracking
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
-
-  // TEMPORARY — global error/rejection listeners for delayed failures
-  useEffect(() => {
-    if (!debugBoardQuery) return;
-
-    const onError = (e: ErrorEvent) => {
-      console.error("[board:globalError]", {
-        ts: new Date().toISOString(),
-        debugBoardQuery,
-        pipeId,
-        message: e.message,
-        filename: e.filename,
-        lineno: e.lineno,
-        colno: e.colno,
-      });
-    };
-
-    const onRejection = (e: PromiseRejectionEvent) => {
-      const reason = e.reason;
-      const msg =
-        reason instanceof Error
-          ? reason.message
-          : typeof reason === "string"
-            ? reason.slice(0, 200)
-            : String(reason).slice(0, 200);
-      console.error("[board:unhandledRejection]", {
-        ts: new Date().toISOString(),
-        debugBoardQuery,
-        pipeId,
-        message: msg,
-        stack: reason instanceof Error ? reason.stack?.split("\n")[0] : undefined,
-      });
-    };
-
-    window.addEventListener("error", onError);
-    window.addEventListener("unhandledrejection", onRejection);
-    return () => {
-      window.removeEventListener("error", onError);
-      window.removeEventListener("unhandledrejection", onRejection);
-    };
-  }, [debugBoardQuery, pipeId]);
-
-  // Build query object dynamically to isolate which nested relation causes failure.
+  // Build query object dynamically for board data loading.
   const boardQuery = (() => {
     const pipeFilter: any = { $: { where: { id: pipeId } } };
-
-    if (debugBoardQuery === "minimal") {
-      pipeFilter.stages = {};
-      return { pipes: pipeFilter, system_settings: {} };
-    }
-
-    if (debugBoardQuery === "cardsOnly") {
-      pipeFilter.stages = { cards: {} };
-      return { pipes: pipeFilter, system_settings: {} };
-    }
-
-    if (debugBoardQuery === "fieldsOnly" || debugBoardQuery === "fieldsNoRender" || debugBoardQuery === "fieldsNoCardsRender") {
-      pipeFilter.stages = { cards: { fields: {} } };
-      return { pipes: pipeFilter, system_settings: {} };
-    }
-
-    // fullNoRender uses the full production query but skips board rendering
-    if (debugBoardQuery === "fullNoRender") {
-      pipeFilter.email_templates = {};
-      pipeFilter.stages = {
-        forms: {},
-        cards: {
-          fields: {},
-          emails: {},
-          form_submissions: { form: {} },
-        },
-      };
-      return { pipes: pipeFilter, system_settings: {} };
-    }
 
     const cardsNested: any = {};
 
     // Only load field records the user has checked in Field Visibility settings.
     // Loading all fields (e.g. 3,968 records) destabilizes the InstantDB realtime
     // subscription for large pipes. Full fields are loaded per-card in CardModalNew.
-    // Debug escape hatch: ?debugBoardQuery=withFields loads all fields (unsafe for large pipes).
     const visibleFieldKeys = [...visibleFields];
-    if (debugBoardQuery === "withFields") {
-      cardsNested.fields = {};
-    } else if (visibleFieldKeys.length > 0 && debugBoardQuery !== "noFields") {
+    if (visibleFieldKeys.length > 0) {
       cardsNested.fields = {
         $: { where: { key: { $in: visibleFieldKeys } } },
       };
     }
-    if (debugBoardQuery !== "noEmails") {
-      cardsNested.emails = {};
-    }
-    if (debugBoardQuery !== "noFormSubmissions") {
-      cardsNested.form_submissions = { form: {} };
-    }
+    cardsNested.emails = {};
+    cardsNested.form_submissions = { form: {} };
 
     pipeFilter.stages = { forms: {}, cards: cardsNested };
-
-    if (debugBoardQuery !== "noEmailTemplates") {
-      pipeFilter.email_templates = {};
-    }
+    pipeFilter.email_templates = {};
 
     return { pipes: pipeFilter, system_settings: {} };
   })();
 
   // Query pipe with stages, cards, emails, form_submissions, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
-
-  // TEMPORARY DIAGNOSTIC — helper to compute safe entity counts from query data
-  const _diagCounts = (pipeData: any) => {
-    const stgs = pipeData?.stages ?? [];
-    let cards = 0, fields = 0, emails = 0, formSubs = 0;
-    for (const s of stgs) {
-      const sc = s.cards ?? [];
-      cards += sc.length;
-      for (const c of sc) {
-        fields += (c.fields ?? []).length;
-        emails += (c.emails ?? []).length;
-        formSubs += (c.form_submissions ?? []).length;
-      }
-    }
-    return {
-      stages: stgs.length,
-      cards,
-      fields,
-      emails,
-      formSubmissions: formSubs,
-      emailTemplates: (pipeData?.email_templates ?? []).length,
-    };
-  };
-
-  // TEMPORARY DIAGNOSTIC LOG — REMOVE AFTER INVESTIGATION
-  // Log every render cycle when debug mode is active
-  if (debugBoardQuery) {
-    const state = isLoading ? "loading" : error ? "error" : data?.pipes?.[0] ? "ok" : "no-pipe";
-    console.log("[board:render]", {
-      ts: new Date().toISOString(),
-      render: renderCountRef.current,
-      debugBoardQuery,
-      pipeId,
-      state,
-      isLoading,
-      errorMessage: error ? (error?.message ?? String(error)) : undefined,
-      pipesCount: data?.pipes?.length ?? 0,
-      ...(data?.pipes?.[0] ? _diagCounts(data.pipes[0]) : {}),
-    });
-  }
 
   const { user } = db.useAuth();
 
@@ -1017,86 +887,12 @@ export default function KanbanPage() {
   }
 
   if (error || !pipe) {
-    // TEMPORARY DIAGNOSTIC LOG — REMOVE AFTER INVESTIGATION
-    console.error("[board:error]", {
-      ts: new Date().toISOString(),
-      render: renderCountRef.current,
-      debugBoardQuery: debugBoardQuery ?? "(none — full query)",
-      pipeId,
-      isLoading,
-      errorMessage: error?.message ?? String(error ?? "no error object"),
-      pipesReturnedCount: data?.pipes?.length ?? 0,
-      pipeExists: Boolean(data?.pipes?.[0]),
-      counts: data?.pipes?.[0] ? _diagCounts(data.pipes[0]) : {},
-    });
-
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-red-600 mb-4">{t('errorLoading')}</p>
-          {/* TEMPORARY — show debug mode hint */}
-          {debugBoardQuery && (
-            <p className="text-xs text-gray-400 mb-2 font-mono">
-              debugBoardQuery={debugBoardQuery} — check console
-            </p>
-          )}
           <Link href="/pipes" className="text-blue-600 hover:underline">
             {t('backToPipes')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // TEMPORARY DIAGNOSTIC — REMOVE AFTER INVESTIGATION
-  // No-render modes: query succeeds, skip board render, show counts + live status.
-  // Keeps the InstantDB subscription alive so we can detect delayed subscription failures.
-  if (
-    debugBoardQuery === "fieldsNoRender" ||
-    debugBoardQuery === "fullNoRender" ||
-    debugBoardQuery === "fieldsNoCardsRender"
-  ) {
-    const counts = _diagCounts(pipe);
-
-    // fieldsNoCardsRender: show stage headers + card counts, no card/field UI
-    if (debugBoardQuery === "fieldsNoCardsRender") {
-      return (
-        <div className="min-h-screen bg-gray-50 p-4">
-          <div className="font-mono text-sm mb-4 p-3 bg-white rounded shadow">
-            <p className="text-green-600 font-bold">fieldsNoCardsRender: query active, card UI skipped</p>
-            <p>pipeId: {pipeId} | render #{renderCountRef.current} | {new Date().toISOString()}</p>
-            <p>stages: {counts.stages} | cards: {counts.cards} | fields: {counts.fields}</p>
-          </div>
-          <div className="flex gap-4 overflow-x-auto">
-            {stages.map((stage: any) => (
-              <div key={stage.id} className="min-w-[200px] bg-white rounded shadow p-3">
-                <h3 className="font-bold text-sm mb-1">{stage.name ?? "(no name)"}</h3>
-                <p className="text-xs text-gray-500">
-                  {(stage.cards ?? []).length} cards,{" "}
-                  {(stage.cards ?? []).reduce((n: number, c: any) => n + (c.fields ?? []).length, 0)} fields
-                </p>
-              </div>
-            ))}
-          </div>
-          <Link href="/pipes" className="text-blue-600 hover:underline block mt-4 text-sm">
-            Back to Pipes
-          </Link>
-        </div>
-      );
-    }
-
-    // fieldsNoRender / fullNoRender: plain summary page
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center font-mono text-sm">
-          <p className="text-green-600 font-bold mb-4">{debugBoardQuery}: query active, render skipped</p>
-          <p>pipeId: {pipeId}</p>
-          <p>render #{renderCountRef.current} | {new Date().toISOString()}</p>
-          <p>stages: {counts.stages} | cards: {counts.cards}</p>
-          <p>fields: {counts.fields} | emails: {counts.emails}</p>
-          <p>formSubmissions: {counts.formSubmissions} | emailTemplates: {counts.emailTemplates}</p>
-          <Link href="/pipes" className="text-blue-600 hover:underline block mt-4">
-            Back to Pipes
           </Link>
         </div>
       </div>
