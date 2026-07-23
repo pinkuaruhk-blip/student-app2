@@ -259,35 +259,77 @@ export default function KanbanPage() {
     })
   );
 
+  // TEMPORARY DIAGNOSTIC — REMOVE AFTER INVESTIGATION
+  // ?debugBoardQuery=minimal|noFields|noEmails|noFormSubmissions|noEmailTemplates|full
+  // When absent, uses the full production query unchanged.
+  const debugBoardQuery = searchParams.get("debugBoardQuery");
+
+  // Build query object dynamically to isolate which nested relation causes failure.
+  const boardQuery = (() => {
+    const pipeFilter: any = { $: { where: { id: pipeId } } };
+
+    if (debugBoardQuery === "minimal") {
+      pipeFilter.stages = {};
+      return { pipes: pipeFilter, system_settings: {} };
+    }
+
+    const cardsNested: any = {};
+
+    if (debugBoardQuery !== "noFields") {
+      cardsNested.fields = {};
+    }
+    if (debugBoardQuery !== "noEmails") {
+      cardsNested.emails = {};
+    }
+    if (debugBoardQuery !== "noFormSubmissions") {
+      cardsNested.form_submissions = { form: {} };
+    }
+
+    pipeFilter.stages = { forms: {}, cards: cardsNested };
+
+    if (debugBoardQuery !== "noEmailTemplates") {
+      pipeFilter.email_templates = {};
+    }
+
+    return { pipes: pipeFilter, system_settings: {} };
+  })();
+
   // Query pipe with its stages and cards (including fields and emails)
-  const { isLoading, error, data } = db.useQuery({
-    pipes: {
-      $: {
-        where: {
-          id: pipeId,
-        },
-      },
-      email_templates: {},
-      stages: {
-        forms: {},
-        cards: {
-          fields: {},
-          emails: {},
-          form_submissions: {
-            form: {},
-          },
-        },
-      },
-    },
-    system_settings: {},
-  });
+  const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
+
+  // TEMPORARY DIAGNOSTIC LOG — REMOVE AFTER INVESTIGATION
+  // Log on successful load when debug mode is active
+  if (debugBoardQuery && !isLoading && !error && data?.pipes?.[0]) {
+    const _p = data.pipes[0] as any;
+    const _stgs = _p.stages ?? [];
+    let _cards = 0, _fields = 0, _emails = 0, _formSubs = 0;
+    for (const _s of _stgs) {
+      const _sc = _s.cards ?? [];
+      _cards += _sc.length;
+      for (const _c of _sc) {
+        _fields += (_c.fields ?? []).length;
+        _emails += (_c.emails ?? []).length;
+        _formSubs += (_c.form_submissions ?? []).length;
+      }
+    }
+    console.log("[board:load] Query succeeded", {
+      debugBoardQuery,
+      pipeId,
+      stages: _stgs.length,
+      cards: _cards,
+      fields: _fields,
+      emails: _emails,
+      formSubmissions: _formSubs,
+      emailTemplates: (_p.email_templates ?? []).length,
+    });
+  }
 
   const { user } = db.useAuth();
 
-  const pipe = data?.pipes?.[0];
+  const pipe = data?.pipes?.[0] as any;
   const stages = (pipe?.stages?.sort((a: any, b: any) => a.position - b.position) || []) as any[];
   const emailTemplates = pipe?.email_templates || [];
-  const systemSettings = data?.system_settings?.[0];
+  const systemSettings = (data as any)?.system_settings?.[0];
 
   // Process emails for inbox view
   const allEmails: any[] = [];
@@ -884,18 +926,47 @@ export default function KanbanPage() {
 
   if (error || !pipe) {
     // TEMPORARY DIAGNOSTIC LOG — REMOVE AFTER INVESTIGATION
+    const diagCounts: Record<string, number> = {};
+    if (data?.pipes?.[0]) {
+      const p = data.pipes[0] as any;
+      const stgs = p.stages ?? [];
+      diagCounts.stages = stgs.length;
+      let cards = 0, fields = 0, emails = 0, formSubs = 0;
+      for (const s of stgs) {
+        const sc = s.cards ?? [];
+        cards += sc.length;
+        for (const c of sc) {
+          fields += (c.fields ?? []).length;
+          emails += (c.emails ?? []).length;
+          formSubs += (c.form_submissions ?? []).length;
+        }
+      }
+      diagCounts.cards = cards;
+      diagCounts.fields = fields;
+      diagCounts.emails = emails;
+      diagCounts.formSubmissions = formSubs;
+      diagCounts.emailTemplates = (p.email_templates ?? []).length;
+    }
     console.error("[board:load] Error loading board", {
+      debugBoardQuery: debugBoardQuery ?? "(none — full query)",
       pipeId,
       isLoading,
       errorMessage: error?.message ?? String(error ?? "no error object"),
       pipesReturnedCount: data?.pipes?.length ?? 0,
       pipeExists: Boolean(data?.pipes?.[0]),
+      counts: diagCounts,
     });
 
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-red-600 mb-4">{t('errorLoading')}</p>
+          {/* TEMPORARY — show debug mode hint */}
+          {debugBoardQuery && (
+            <p className="text-xs text-gray-400 mb-2 font-mono">
+              debugBoardQuery={debugBoardQuery} — check console
+            </p>
+          )}
           <Link href="/pipes" className="text-blue-600 hover:underline">
             {t('backToPipes')}
           </Link>
