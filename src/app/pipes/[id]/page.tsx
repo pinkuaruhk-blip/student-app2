@@ -345,7 +345,12 @@ export default function KanbanPage() {
 
     const cardsNested: any = {};
 
-    if (debugBoardQuery !== "noFields") {
+    // fields are intentionally NOT loaded in the board-level live query.
+    // With large pipes (e.g. 3,968 fields), including fields destabilizes
+    // the InstantDB realtime subscription. Fields are loaded per-card in
+    // CardModalNew when a card is opened.
+    // The debug param "noFields" is kept; default path also omits fields.
+    if (debugBoardQuery === "withFields") {
       cardsNested.fields = {};
     }
     if (debugBoardQuery !== "noEmails") {
@@ -364,7 +369,7 @@ export default function KanbanPage() {
     return { pipes: pipeFilter, system_settings: {} };
   })();
 
-  // Query pipe with its stages and cards (including fields and emails)
+  // Query pipe with its stages and cards (emails, form_submissions, but not fields)
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
 
   // TEMPORARY DIAGNOSTIC — helper to compute safe entity counts from query data
@@ -430,7 +435,7 @@ export default function KanbanPage() {
               name: stage.name,
               backgroundColor: stage.backgroundColor,
             },
-            fields: card.fields,
+            fields: card.fields || [],
           },
         });
       });
