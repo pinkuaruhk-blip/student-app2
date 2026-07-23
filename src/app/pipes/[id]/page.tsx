@@ -883,6 +883,15 @@ export default function KanbanPage() {
   }
 
   if (error || !pipe) {
+    // TEMPORARY DIAGNOSTIC LOG — REMOVE AFTER INVESTIGATION
+    console.error("[board:load] Error loading board", {
+      pipeId,
+      isLoading,
+      errorMessage: error?.message ?? String(error ?? "no error object"),
+      pipesReturnedCount: data?.pipes?.length ?? 0,
+      pipeExists: Boolean(data?.pipes?.[0]),
+    });
+
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
