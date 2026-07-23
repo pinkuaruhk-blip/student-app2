@@ -345,13 +345,17 @@ export default function KanbanPage() {
 
     const cardsNested: any = {};
 
-    // fields are intentionally NOT loaded in the board-level live query.
-    // With large pipes (e.g. 3,968 fields), including fields destabilizes
-    // the InstantDB realtime subscription. Fields are loaded per-card in
-    // CardModalNew when a card is opened.
-    // The debug param "noFields" is kept; default path also omits fields.
+    // Only load field records the user has checked in Field Visibility settings.
+    // Loading all fields (e.g. 3,968 records) destabilizes the InstantDB realtime
+    // subscription for large pipes. Full fields are loaded per-card in CardModalNew.
+    // Debug escape hatch: ?debugBoardQuery=withFields loads all fields (unsafe for large pipes).
+    const visibleFieldKeys = [...visibleFields];
     if (debugBoardQuery === "withFields") {
       cardsNested.fields = {};
+    } else if (visibleFieldKeys.length > 0 && debugBoardQuery !== "noFields") {
+      cardsNested.fields = {
+        $: { where: { key: { $in: visibleFieldKeys } } },
+      };
     }
     if (debugBoardQuery !== "noEmails") {
       cardsNested.emails = {};
@@ -369,7 +373,7 @@ export default function KanbanPage() {
     return { pipes: pipeFilter, system_settings: {} };
   })();
 
-  // Query pipe with its stages and cards (emails, form_submissions, but not fields)
+  // Query pipe with stages, cards, emails, form_submissions, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
 
   // TEMPORARY DIAGNOSTIC — helper to compute safe entity counts from query data
