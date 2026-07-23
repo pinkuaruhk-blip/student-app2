@@ -260,7 +260,8 @@ export default function KanbanPage() {
   );
 
   // TEMPORARY DIAGNOSTIC — REMOVE AFTER INVESTIGATION
-  // ?debugBoardQuery=minimal|noFields|noEmails|noFormSubmissions|noEmailTemplates|full
+  // ?debugBoardQuery=minimal|cardsOnly|fieldsOnly|fieldsNoRender
+  //                  |noFields|noEmails|noFormSubmissions|noEmailTemplates|full
   // When absent, uses the full production query unchanged.
   const debugBoardQuery = searchParams.get("debugBoardQuery");
 
@@ -270,6 +271,16 @@ export default function KanbanPage() {
 
     if (debugBoardQuery === "minimal") {
       pipeFilter.stages = {};
+      return { pipes: pipeFilter, system_settings: {} };
+    }
+
+    if (debugBoardQuery === "cardsOnly") {
+      pipeFilter.stages = { cards: {} };
+      return { pipes: pipeFilter, system_settings: {} };
+    }
+
+    if (debugBoardQuery === "fieldsOnly" || debugBoardQuery === "fieldsNoRender") {
+      pipeFilter.stages = { cards: { fields: {} } };
       return { pipes: pipeFilter, system_settings: {} };
     }
 
@@ -969,6 +980,36 @@ export default function KanbanPage() {
           )}
           <Link href="/pipes" className="text-blue-600 hover:underline">
             {t('backToPipes')}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // TEMPORARY DIAGNOSTIC — REMOVE AFTER INVESTIGATION
+  // fieldsNoRender: query includes fields but skip full board render to separate
+  // InstantDB query failure from React rendering failure.
+  if (debugBoardQuery === "fieldsNoRender") {
+    const stgs = pipe?.stages ?? [];
+    let cardCount = 0;
+    let fieldCount = 0;
+    for (const s of stgs) {
+      const sc = s.cards ?? [];
+      cardCount += sc.length;
+      for (const c of sc) {
+        fieldCount += (c.fields ?? []).length;
+      }
+    }
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center font-mono text-sm">
+          <p className="text-green-600 font-bold mb-4">fieldsNoRender: query succeeded, render skipped</p>
+          <p>pipeId: {pipeId}</p>
+          <p>stages: {stgs.length}</p>
+          <p>cards: {cardCount}</p>
+          <p>fields: {fieldCount}</p>
+          <Link href="/pipes" className="text-blue-600 hover:underline block mt-4">
+            Back to Pipes
           </Link>
         </div>
       </div>
