@@ -54,6 +54,7 @@ export default function KanbanPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hoveredStageId, setHoveredStageId] = useState<string | null>(null);
   const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set());
+  const [kanbanDisplayLoaded, setKanbanDisplayLoaded] = useState(false);
   const [formBuilderStageId, setFormBuilderStageId] = useState<string | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -234,21 +235,25 @@ export default function KanbanPage() {
       .catch(err => console.error("Failed to load field definitions:", err));
   }, []);
 
-  // Load display settings
+  // Load display settings before the board query so InstantDB does not
+  // subscribe without fields and then resubscribe with a field filter.
   useEffect(() => {
     fetch("/api/kanban-display")
       .then(res => res.json())
       .then(data => {
-        if (data.settings) {
-          const visible = new Set<string>(
-            data.settings
-              .filter((s: any) => s.showOnCard)
-              .map((s: any) => s.fieldName)
-          );
-          setVisibleFields(visible);
-        }
+        const visible = new Set<string>(
+          (Array.isArray(data.settings) ? data.settings : [])
+            .filter((s: any) => s.showOnCard)
+            .map((s: any) => s.fieldName)
+        );
+        setVisibleFields(visible);
+        setKanbanDisplayLoaded(true);
       })
-      .catch(err => console.error("Failed to load display settings:", err));
+      .catch(err => {
+        console.error("Failed to load display settings:", err);
+        setVisibleFields(new Set());
+        setKanbanDisplayLoaded(true);
+      });
   }, []);
 
   const sensors = useSensors(
@@ -260,28 +265,32 @@ export default function KanbanPage() {
   );
 
   // Build query object dynamically for board data loading.
-  const boardQuery = (() => {
-    const pipeFilter: any = { $: { where: { id: pipeId } } };
+  // Pass null until Kanban Display settings resolve so the first real
+  // InstantDB subscription already includes the correct field filter.
+  const boardQuery = kanbanDisplayLoaded
+    ? (() => {
+        const pipeFilter: any = { $: { where: { id: pipeId } } };
 
-    const cardsNested: any = {};
+        const cardsNested: any = {};
 
-    // Only load field records the user has checked in Field Visibility settings.
-    // Loading all fields (e.g. 3,968 records) destabilizes the InstantDB realtime
-    // subscription for large pipes. Full fields are loaded per-card in CardModalNew.
-    const visibleFieldKeys = [...visibleFields];
-    if (visibleFieldKeys.length > 0) {
-      cardsNested.fields = {
-        $: { where: { key: { $in: visibleFieldKeys } } },
-      };
-    }
-    cardsNested.emails = {};
-    cardsNested.form_submissions = { form: {} };
+        // Only load field records the user has checked in Field Visibility settings.
+        // Loading all fields (e.g. 3,968 records) destabilizes the InstantDB realtime
+        // subscription for large pipes. Full fields are loaded per-card in CardModalNew.
+        const visibleFieldKeys = [...visibleFields];
+        if (visibleFieldKeys.length > 0) {
+          cardsNested.fields = {
+            $: { where: { key: { $in: visibleFieldKeys } } },
+          };
+        }
+        cardsNested.emails = {};
+        cardsNested.form_submissions = { form: {} };
 
-    pipeFilter.stages = { forms: {}, cards: cardsNested };
-    pipeFilter.email_templates = {};
+        pipeFilter.stages = { forms: {}, cards: cardsNested };
+        pipeFilter.email_templates = {};
 
-    return { pipes: pipeFilter, system_settings: {} };
-  })();
+        return { pipes: pipeFilter, system_settings: {} };
+      })()
+    : null;
 
   // Query pipe with stages, cards, emails, form_submissions, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
@@ -875,7 +884,7 @@ export default function KanbanPage() {
     ? stages.flatMap((s: any) => s.cards).find((c: any) => c.id === activeId)
     : null;
 
-  if (isLoading) {
+  if (!kanbanDisplayLoaded || isLoading || (!error && data == null)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
