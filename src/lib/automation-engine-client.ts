@@ -103,7 +103,11 @@ export async function checkAndExecuteAutomations(params: {
     // Execute each matching automation in sequence
     for (const automation of matchingAutomations) {
       console.log(`▶️ Executing automation: ${automation.name}`);
-      const execResult = await executeAutomation(automation, params.cardId);
+      const execResult = await executeAutomation(
+        automation,
+        params.cardId,
+        params.context
+      );
 
       if (execResult.status === "success") {
         report.automationsExecuted.push(automation.name);
@@ -165,21 +169,50 @@ function matchesTriggerConfig(
   }
 }
 
-async function executeAutomation(automation: any, cardId: string) {
+type AutomationContext = {
+  formId?: string;
+  stageId?: string;
+  fieldKey?: string;
+  fieldValue?: any;
+};
+
+async function executeAutomation(
+  automation: any,
+  cardId: string,
+  context?: AutomationContext
+) {
   const logId = generateId();
   const actionsExecuted: any[] = [];
   let status = "success";
   let errorMessage: string | undefined;
   let conditionsMet: boolean | undefined;
+  let moveAttempted = false;
+  let moveSucceeded = false;
 
-  console.log(`  🔄 Starting execution: ${automation.name}`);
+  console.log(`  🔄 Starting execution: ${automation.name}`, {
+    automationId: automation.id,
+    automationName: automation.name,
+    cardId,
+    formId: context?.formId,
+  });
 
   try {
     // Check conditions if they exist
     if (automation.conditions && automation.conditions.rules.length > 0) {
       console.log(`  🔍 Evaluating ${automation.conditions.rules.length} conditions...`);
-      conditionsMet = await evaluateConditions(automation.conditions, cardId);
-      console.log(`  ${conditionsMet ? "✅" : "❌"} Conditions: ${conditionsMet}`);
+      conditionsMet = await evaluateConditions(
+        automation.conditions,
+        cardId,
+        context
+      );
+      console.log(`  ${conditionsMet ? "✅" : "❌"} Conditions: ${conditionsMet}`, {
+        automationId: automation.id,
+        automationName: automation.name,
+        cardId,
+        formId: context?.formId,
+        conditionsMet,
+        skippedReason: conditionsMet ? undefined : "conditions_not_met",
+      });
 
       if (!conditionsMet) {
         status = "skipped";
@@ -195,7 +228,7 @@ async function executeAutomation(automation: any, cardId: string) {
             })
             .link({ card: cardId, automation: automation.id }),
         ]);
-        return { status, conditionsMet, actionsExecuted, logId };
+        return { status, conditionsMet, actionsExecuted, logId, moveAttempted, moveSucceeded };
       }
     }
 
@@ -204,8 +237,29 @@ async function executeAutomation(automation: any, cardId: string) {
     // Execute each action
     for (const action of automation.actions || []) {
       console.log(`    ▶️ Action: ${action.type}`);
+      const isMoveCard = action.type === "move_card";
+      if (isMoveCard) {
+        moveAttempted = true;
+        console.log("[automation] move_card attempted", {
+          automationId: automation.id,
+          automationName: automation.name,
+          cardId,
+          formId: context?.formId,
+          targetStageId: action.config?.targetStageId,
+        });
+      }
       try {
         const result = await executeAction(action, cardId);
+        if (isMoveCard) {
+          moveSucceeded = true;
+          console.log("[automation] move_card succeeded", {
+            automationId: automation.id,
+            automationName: automation.name,
+            cardId,
+            formId: context?.formId,
+            targetStageId: action.config?.targetStageId,
+          });
+        }
         console.log(`    ✅ Action completed`);
         actionsExecuted.push({
           type: action.type,
@@ -215,6 +269,16 @@ async function executeAutomation(automation: any, cardId: string) {
         });
       } catch (error: any) {
         console.error(`    ❌ Action failed:`, error.message);
+        if (isMoveCard) {
+          console.error("[automation] move_card failed", {
+            automationId: automation.id,
+            automationName: automation.name,
+            cardId,
+            formId: context?.formId,
+            targetStageId: action.config?.targetStageId,
+            errorMessage: error.message,
+          });
+        }
         actionsExecuted.push({
           type: action.type,
           config: action.config,
@@ -227,7 +291,13 @@ async function executeAutomation(automation: any, cardId: string) {
   } catch (error: any) {
     status = "error";
     errorMessage = error.message;
-    console.error(`  ❌ Automation failed:`, error.message);
+    console.error(`  ❌ Automation failed:`, {
+      automationId: automation.id,
+      automationName: automation.name,
+      cardId,
+      formId: context?.formId,
+      errorMessage: error.message,
+    });
   }
 
   // Log the automation execution
@@ -250,10 +320,64 @@ async function executeAutomation(automation: any, cardId: string) {
     console.error(`  ❌ Failed to create log:`, logError);
   }
 
-  return { status, conditionsMet, actionsExecuted, errorMessage, logId };
+  return { status, conditionsMet, actionsExecuted, errorMessage, logId, moveAttempted, moveSucceeded };
 }
 
-async function evaluateConditions(conditions: any, cardId: string): Promise<boolean> {
+function getLinkedForm(submission: any): { id?: string; name?: string } | undefined {
+  if (!submission?.form) return undefined;
+  return Array.isArray(submission.form) ? submission.form[0] : submission.form;
+}
+
+function findSubmissionForFormCondition(
+  submissions: any[] | undefined,
+  parsedFormName: string,
+  contextFormId?: string
+) {
+  const list = submissions || [];
+
+  const findByName = () =>
+    list.find(
+      (sub: any) =>
+        getLinkedForm(sub)?.name?.toLowerCase() === parsedFormName.toLowerCase()
+    );
+
+  // Legacy / non-form-submission contexts: name lookup only.
+  if (!contextFormId) {
+    return findByName();
+  }
+
+  const byFormId = list.find(
+    (sub: any) => getLinkedForm(sub)?.id === contextFormId
+  );
+
+  if (!byFormId) {
+    return findByName();
+  }
+
+  const submittedFormName = getLinkedForm(byFormId)?.name;
+  if (
+    !submittedFormName ||
+    submittedFormName.toLowerCase() === parsedFormName.toLowerCase()
+  ) {
+    return byFormId;
+  }
+
+  // Rule names a different form than the one just submitted (e.g. admin form).
+  const byName = findByName();
+  if (byName && getLinkedForm(byName)?.id !== contextFormId) {
+    return byName;
+  }
+
+  // Name in the rule did not match another form. Treat as the submitted form
+  // so a fragile/mismatched name still resolves via formId.
+  return byFormId;
+}
+
+async function evaluateConditions(
+  conditions: any,
+  cardId: string,
+  context?: AutomationContext
+): Promise<boolean> {
   const { data } = await db.queryOnce({
     cards: {
       $: { where: { id: cardId } },
@@ -277,9 +401,10 @@ async function evaluateConditions(conditions: any, cardId: string): Promise<bool
 
       const [, formName, fieldName] = match;
 
-      // Find the form submission
-      const submission = card.form_submissions?.find(
-        (sub: any) => sub.form?.name?.toLowerCase() === formName.toLowerCase()
+      const submission = findSubmissionForFormCondition(
+        card.form_submissions,
+        formName,
+        context?.formId
       );
 
       // If no submission exists, treat it as empty field
