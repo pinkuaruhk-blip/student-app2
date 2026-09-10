@@ -123,6 +123,40 @@ export async function checkAndExecuteAutomations(params: {
       }
     }
 
+    if (
+      params.triggerType === "form_submission" &&
+      matchingAutomations.length > 0 &&
+      report.automationsSkipped.length === matchingAutomations.length
+    ) {
+      console.warn("[automation] all matched form_submission automations skipped", {
+        cardId: params.cardId,
+        pipeId: params.pipeId,
+        formId: params.context?.formId,
+        matchedCount: matchingAutomations.length,
+        skippedCount: report.automationsSkipped.length,
+        succeededCount: report.automationsExecuted.length,
+        failedCount: report.automationsFailed.length,
+        automations: matchingAutomations.map((automation: any) => ({
+          id: automation.id,
+          name: automation.name,
+        })),
+        skipReasons: matchingAutomations.map((automation: any) => {
+          const detail = report.details.find((row: any) => row.id === automation.id);
+          return {
+            id: automation.id,
+            name: automation.name,
+            status: detail?.execution?.status,
+            skippedReason:
+              detail?.execution?.status === "skipped"
+                ? "conditions_not_met"
+                : detail?.execution?.status === "error"
+                  ? "error"
+                  : undefined,
+          };
+        }),
+      });
+    }
+
     return report;
   } catch (error) {
     console.error("❌ Error checking/executing automations:", error);
@@ -323,54 +357,79 @@ async function executeAutomation(
   return { status, conditionsMet, actionsExecuted, errorMessage, logId, moveAttempted, moveSucceeded };
 }
 
+function normalizeFormName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name.trim().normalize("NFC").toLowerCase();
+}
+
 function getLinkedForm(submission: any): { id?: string; name?: string } | undefined {
   if (!submission?.form) return undefined;
-  return Array.isArray(submission.form) ? submission.form[0] : submission.form;
+  const form = Array.isArray(submission.form) ? submission.form[0] : submission.form;
+  if (!form || typeof form !== "object") return undefined;
+  return form;
+}
+
+function asFormRef(raw: any): { id: string; name: string } | null {
+  const form = Array.isArray(raw) ? raw[0] : raw;
+  if (!form?.id || typeof form.id !== "string") return null;
+  return { id: form.id, name: typeof form.name === "string" ? form.name : "" };
+}
+
+function collectSafeFormIdsByNormalizedName(
+  forms: Array<{ id: string; name: string }>
+): Map<string, string> {
+  const collisions = new Set<string>();
+  const map = new Map<string, string>();
+  for (const form of forms) {
+    const key = normalizeFormName(form.name);
+    if (!key) continue;
+    const existing = map.get(key);
+    if (existing && existing !== form.id) {
+      collisions.add(key);
+      continue;
+    }
+    map.set(key, form.id);
+  }
+  for (const key of collisions) {
+    map.delete(key);
+  }
+  return map;
+}
+
+function resolveFormIdForCondition(
+  parsedFormName: string,
+  contextFormId: string | undefined,
+  triggerFormName: string | undefined,
+  formIdsByNormalizedName: Map<string, string>
+): string | undefined {
+  const normalized = normalizeFormName(parsedFormName);
+  if (!normalized) return undefined;
+
+  if (contextFormId && normalizeFormName(triggerFormName) === normalized) {
+    return contextFormId;
+  }
+
+  return formIdsByNormalizedName.get(normalized);
 }
 
 function findSubmissionForFormCondition(
   submissions: any[] | undefined,
   parsedFormName: string,
-  contextFormId?: string
+  targetFormId?: string
 ) {
   const list = submissions || [];
-
-  const findByName = () =>
-    list.find(
-      (sub: any) =>
-        getLinkedForm(sub)?.name?.toLowerCase() === parsedFormName.toLowerCase()
+  if (targetFormId) {
+    const byFormId = list.find(
+      (sub: any) => getLinkedForm(sub)?.id === targetFormId
     );
-
-  // Legacy / non-form-submission contexts: name lookup only.
-  if (!contextFormId) {
-    return findByName();
+    if (byFormId) return byFormId;
   }
 
-  const byFormId = list.find(
-    (sub: any) => getLinkedForm(sub)?.id === contextFormId
+  const normalized = normalizeFormName(parsedFormName);
+  if (!normalized) return undefined;
+  return list.find(
+    (sub: any) => normalizeFormName(getLinkedForm(sub)?.name) === normalized
   );
-
-  if (!byFormId) {
-    return findByName();
-  }
-
-  const submittedFormName = getLinkedForm(byFormId)?.name;
-  if (
-    !submittedFormName ||
-    submittedFormName.toLowerCase() === parsedFormName.toLowerCase()
-  ) {
-    return byFormId;
-  }
-
-  // Rule names a different form than the one just submitted (e.g. admin form).
-  const byName = findByName();
-  if (byName && getLinkedForm(byName)?.id !== contextFormId) {
-    return byName;
-  }
-
-  // Name in the rule did not match another form. Treat as the submitted form
-  // so a fragile/mismatched name still resolves via formId.
-  return byFormId;
 }
 
 async function evaluateConditions(
@@ -382,6 +441,9 @@ async function evaluateConditions(
     cards: {
       $: { where: { id: cardId } },
       fields: {},
+      stage: {
+        forms: {},
+      },
       form_submissions: {
         form: {},
       },
@@ -390,6 +452,30 @@ async function evaluateConditions(
 
   const card = data?.cards?.[0];
   if (!card) return false;
+
+  const stageForms = (card.stage?.forms || [])
+    .map((form: any) => asFormRef(form))
+    .filter((form: { id: string; name: string } | null): form is { id: string; name: string } =>
+      Boolean(form)
+    );
+  const submissionForms = (card.form_submissions || [])
+    .map((sub: any) => asFormRef(getLinkedForm(sub)))
+    .filter((form: { id: string; name: string } | null): form is { id: string; name: string } =>
+      Boolean(form)
+    );
+  const formIdsByNormalizedName = collectSafeFormIdsByNormalizedName([
+    ...stageForms,
+    ...submissionForms,
+  ]);
+
+  const triggerSubmission = context?.formId
+    ? (card.form_submissions || []).find(
+        (sub: any) => getLinkedForm(sub)?.id === context.formId
+      )
+    : undefined;
+  const triggerFormName =
+    getLinkedForm(triggerSubmission)?.name ||
+    stageForms.find((form) => form.id === context?.formId)?.name;
 
   const { logic, rules } = conditions;
 
@@ -400,11 +486,17 @@ async function evaluateConditions(
       if (!match) return false;
 
       const [, formName, fieldName] = match;
+      const targetFormId = resolveFormIdForCondition(
+        formName,
+        context?.formId,
+        triggerFormName,
+        formIdsByNormalizedName
+      );
 
       const submission = findSubmissionForFormCondition(
         card.form_submissions,
         formName,
-        context?.formId
+        targetFormId
       );
 
       // If no submission exists, treat it as empty field
