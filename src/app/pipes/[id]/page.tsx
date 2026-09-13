@@ -282,8 +282,14 @@ export default function KanbanPage() {
             $: { where: { key: { $in: visibleFieldKeys } } },
           };
         }
-        cardsNested.emails = {};
-        cardsNested.form_submissions = { form: {} };
+        cardsNested.emails = {
+          $: {
+            where: {
+              direction: "received",
+              read: false,
+            },
+          },
+        };
 
         pipeFilter.stages = { forms: {}, cards: cardsNested };
         pipeFilter.email_templates = {};
@@ -292,8 +298,26 @@ export default function KanbanPage() {
       })()
     : null;
 
-  // Query pipe with stages, cards, emails, form_submissions, and only visible fields
+  // Query pipe with stages, cards, unread received emails, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
+
+  const inboxQuery =
+    currentView === "inbox"
+      ? {
+          pipes: {
+            $: { where: { id: pipeId } },
+            stages: {
+              cards: {
+                emails: {},
+                form_submissions: { form: {} },
+                fields: {},
+              },
+            },
+          },
+        }
+      : null;
+
+  const { data: inboxData } = db.useQuery(inboxQuery as any) as { data: any };
 
   const { user } = db.useAuth();
 
@@ -302,31 +326,35 @@ export default function KanbanPage() {
   const emailTemplates = pipe?.email_templates || [];
   const systemSettings = (data as any)?.system_settings?.[0];
 
-  // Process emails for inbox view
+  // Process emails for inbox view from the inbox-only query (full payloads).
   const allEmails: any[] = [];
-  stages.forEach((stage: any) => {
-    stage.cards?.forEach((card: any) => {
-      card.emails?.forEach((email: any) => {
-        allEmails.push({
-          ...email,
-          card: {
-            id: card.id,
-            title: card.title,
-            description: card.description,
-            stage: {
-              id: stage.id,
-              name: stage.name,
-              backgroundColor: stage.backgroundColor,
+  if (currentView === "inbox") {
+    const inboxStages = inboxData?.pipes?.[0]?.stages || [];
+    inboxStages.forEach((stage: any) => {
+      stage.cards?.forEach((card: any) => {
+        card.emails?.forEach((email: any) => {
+          allEmails.push({
+            ...email,
+            card: {
+              id: card.id,
+              title: card.title,
+              description: card.description,
+              stage: {
+                id: stage.id,
+                name: stage.name,
+                backgroundColor: stage.backgroundColor,
+              },
+              fields: card.fields || [],
+              form_submissions: card.form_submissions || [],
             },
-            fields: card.fields || [],
-          },
+          });
         });
       });
     });
-  });
 
-  // Sort emails by sentAt descending
-  allEmails.sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+    // Sort emails by sentAt descending
+    allEmails.sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+  }
 
   // Filter emails for inbox
   let filteredEmails = allEmails;
@@ -340,7 +368,21 @@ export default function KanbanPage() {
   }
 
   const displayedEmails = filteredEmails.slice(0, displayCount);
-  const unreadCount = allEmails.filter((email) => !email.read).length;
+  // Unread badge uses the slim board query so Kanban view still has a count
+  // without loading full email bodies.
+  const unreadCount = stages.reduce((total: number, stage: any) => {
+    return (
+      total +
+      (stage.cards || []).reduce((cardTotal: number, card: any) => {
+        return (
+          cardTotal +
+          (card.emails || []).filter(
+            (email: any) => email.direction === "received" && !email.read
+          ).length
+        );
+      }, 0)
+    );
+  }, 0);
   const selectedCardEmails = selectedEmail
     ? allEmails.filter((email) => email.card.id === selectedEmail.card.id)
     : [];
@@ -463,15 +505,19 @@ export default function KanbanPage() {
       setShowBcc(!!template.bcc);
 
       const card = selectedEmail.card;
+      const inboxCard = inboxData?.pipes?.[0]?.stages
+        ?.flatMap((s: any) => s.cards || [])
+        .find((c: any) => c.id === card.id);
       const stage = stages.find((s: any) => s.id === card.stage.id);
-      const formSubmissions = (card.form_submissions || []).sort((a: any, b: any) => b.submittedAt - a.submittedAt);
+      const formSubmissions = (inboxCard?.form_submissions || card.form_submissions || []).sort((a: any, b: any) => b.submittedAt - a.submittedAt);
       const clientForms = (stage?.forms || []).filter((f: any) => f.formType !== "admin");
+      const cardFields = inboxCard?.fields || card.fields || [];
 
       const processedSubject = replacePlaceholders(template.subject, {
         card: {
           title: card.title,
           description: card.description,
-          fields: card.fields || [],
+          fields: cardFields,
         },
         stage: {
           name: stage?.name,
@@ -489,7 +535,7 @@ export default function KanbanPage() {
         card: {
           title: card.title,
           description: card.description,
-          fields: card.fields || [],
+          fields: cardFields,
         },
         stage: {
           name: stage?.name,
