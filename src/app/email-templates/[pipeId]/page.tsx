@@ -336,14 +336,14 @@ function TemplateEditor({
               To Email (Optional)
             </label>
             <input
-              type="email"
+              type="text"
               value={toEmail}
               onChange={(e) => setToEmail(e.target.value)}
-              placeholder="e.g., recipient@example.com (leave blank to use card field)"
+              placeholder="e.g., recipient@example.com (comma-separated for multiple)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Override recipient email. Leave blank to use the email field from automation config.
+              Override recipient email. Separate multiple emails with commas. Leave blank to use the email field from automation config.
             </p>
           </div>
 
@@ -370,14 +370,14 @@ function TemplateEditor({
               BCC (Optional)
             </label>
             <input
-              type="email"
+              type="text"
               value={bcc}
               onChange={(e) => setBcc(e.target.value)}
-              placeholder="e.g., admin@example.com (leave blank for no BCC)"
+              placeholder="e.g., admin@example.com (comma-separated for multiple)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Blind carbon copy recipient. Leave blank to not send BCC.
+              Blind carbon copy recipients. Separate multiple emails with commas. Leave blank to not send BCC.
             </p>
           </div>
 

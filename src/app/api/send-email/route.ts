@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
+import {
+  isValidEmail,
+  isValidRecipientAddress,
+  normalizeRecipientField,
+  persistRecipientField,
+} from "@/lib/email-recipients";
 import { replacePlaceholders } from "@/lib/placeholders";
 import { Resend } from "resend";
 
@@ -10,73 +16,6 @@ const RESEND_GENERIC_SEND_ERROR_MESSAGE =
   "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
 const RESEND_SUPPRESSED_RECIPIENT_MESSAGE =
   "Resend suppressed this recipient due to a previous hard bounce, spam complaint, or suppression list entry. Please verify the recipient address and review the Resend dashboard.";
-
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function isValidEmail(value: string): boolean {
-  return emailRegex.test(value);
-}
-
-type RecipientFieldInput = string | string[] | null | undefined;
-
-function splitRecipientEntries(value: string): string[] {
-  const entries: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  let angleBracketDepth = 0;
-
-  for (const char of value) {
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      current += char;
-      continue;
-    }
-
-    if (!inQuotes) {
-      if (char === "<") {
-        angleBracketDepth += 1;
-      } else if (char === ">") {
-        angleBracketDepth = Math.max(0, angleBracketDepth - 1);
-      }
-
-      if ((char === "," || char === ";") && angleBracketDepth === 0) {
-        entries.push(current);
-        current = "";
-        continue;
-      }
-    }
-
-    current += char;
-  }
-
-  entries.push(current);
-  return entries;
-}
-
-function getRecipientEmailAddress(recipient: string): string {
-  const displayNameMatch = recipient.match(/^.*<([^<>]+)>\s*$/);
-  return displayNameMatch ? displayNameMatch[1].trim() : recipient;
-}
-
-function isValidRecipientAddress(recipient: string): boolean {
-  const emailAddress = getRecipientEmailAddress(recipient.trim());
-  return isValidEmail(emailAddress);
-}
-
-function normalizeRecipientField(value: RecipientFieldInput): string[] | undefined {
-  if (value === null || value === undefined) {
-    return undefined;
-  }
-
-  const rawValues = Array.isArray(value) ? value : [value];
-  const normalizedRecipients = rawValues
-    .filter((entry): entry is string => typeof entry === "string")
-    .flatMap((entry) => splitRecipientEntries(entry))
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-
-  return normalizedRecipients.length > 0 ? normalizedRecipients : undefined;
-}
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -261,16 +200,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate email format
-    if (!isValidEmail(to)) {
+    const normalizedTo = normalizeRecipientField(to);
+    const normalizedCc = normalizeRecipientField(cc);
+    const normalizedBcc = normalizeRecipientField(bcc);
+
+    if (!normalizedTo) {
       return NextResponse.json(
-        { error: "Invalid email address format", email: to },
+        { error: "Invalid to email address" },
         { status: 400 }
       );
     }
 
-    const normalizedCc = normalizeRecipientField(cc);
-    const normalizedBcc = normalizeRecipientField(bcc);
+    if (normalizedTo.some((recipient) => !isValidRecipientAddress(recipient))) {
+      return NextResponse.json(
+        { error: "Invalid to email address" },
+        { status: 400 }
+      );
+    }
 
     if (normalizedCc?.some((recipient) => !isValidRecipientAddress(recipient))) {
       return NextResponse.json(
@@ -286,8 +232,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const persistedTo = normalizedTo.join(", ");
+    const persistedCc = persistRecipientField(normalizedCc);
+
     const recipientCount =
-      1 + (normalizedCc?.length || 0) + (normalizedBcc?.length || 0);
+      normalizedTo.length + (normalizedCc?.length || 0) + (normalizedBcc?.length || 0);
     log("recipient count", recipientCount);
 
     if (!RESEND_API_KEY) {
@@ -476,8 +425,8 @@ export async function POST(request: NextRequest) {
           adminDb.tx.card_emails[cardEmailId].update({
             direction: "sent",
             from: formattedFrom,
-            to,
-            cc: normalizedCc?.join(", "),
+            to: persistedTo,
+            cc: persistedCc,
             subject: subjectWithCardId, // Store subject with card ID and placeholders replaced
             body: processedBody, // Store body with placeholders replaced
             sentAt: sentTimestamp,
@@ -515,7 +464,7 @@ export async function POST(request: NextRequest) {
 
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: resendFrom,
-      to,
+      to: normalizedTo,
       cc: normalizedCc,
       bcc: normalizedBcc,
       replyTo: effectiveFromEmail,
@@ -571,7 +520,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Email sent successfully",
-      to,
+      to: persistedTo,
       subject: processedSubject, // Return processed subject (without card ID)
       emailId,
       resendId,

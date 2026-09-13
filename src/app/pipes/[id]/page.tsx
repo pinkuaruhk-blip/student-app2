@@ -1717,7 +1717,7 @@ export default function KanbanPage() {
                             value={emailTo}
                             onChange={(e) => setEmailTo(e.target.value)}
                             className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                            placeholder="recipient@example.com"
+                            placeholder="recipient@example.com (comma-separated for multiple)"
                           />
                           {/* Cc/Bcc Toggle Buttons */}
                           <div className="flex gap-1 mt-1">
@@ -1903,7 +1903,7 @@ export default function KanbanPage() {
                                     value={emailTo}
                                     onChange={(e) => setEmailTo(e.target.value)}
                                     className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                                    placeholder="recipient@example.com"
+                                    placeholder="recipient@example.com (comma-separated for multiple)"
                                   />
                                   {/* Cc/Bcc Toggle Buttons */}
                                   <div className="flex gap-1 mt-1">
