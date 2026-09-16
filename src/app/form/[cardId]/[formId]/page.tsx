@@ -4,7 +4,6 @@ import { useState, useEffect, use } from "react";
 import { db } from "@/lib/db";
 import { id } from "@instantdb/react";
 import { replacePlaceholders } from "@/lib/placeholders";
-import { checkAndExecuteAutomations } from "@/lib/automation-engine-client";
 import { useTranslations } from "next-intl";
 
 interface FormField {
@@ -130,7 +129,7 @@ export default function PublicFormPage({ params }: PageProps) {
           (sub: any) => sub.form?.id === formId
         );
 
-        if (existingSubmission) {
+        if (existingSubmission && !submitting) {
           setSubmitted(true);
         }
 
@@ -163,7 +162,7 @@ export default function PublicFormPage({ params }: PageProps) {
       }
       setLoading(false);
     }
-  }, [data, isLoading, formId]);
+  }, [data, isLoading, formId, submitting]);
 
   const handleInputChange = (fieldName: string, value: any) => {
     setResponses({
@@ -402,37 +401,72 @@ export default function PublicFormPage({ params }: PageProps) {
       console.log("✅ Transaction result:", result);
       console.log("✅ Transaction completed successfully");
 
-      // Wait a moment for the data to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        console.log("Triggering server-side form submission automations", {
+          cardId,
+          formId,
+          submissionId,
+        });
 
-      // Trigger automations for form submission
-      const card = data?.cards?.[0];
-      if (card?.stage?.pipe?.id) {
+        const automationResponse = await fetch(
+          "/api/form-submission-automations/execute",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cardId, formId, submissionId }),
+          }
+        );
+
+        let automationResult: {
+          success?: boolean;
+          status?: string;
+          matchedCount?: number;
+          succeededCount?: number;
+          skippedCount?: number;
+          failedCount?: number;
+          error?: string;
+        } | null = null;
         try {
-          console.log("🤖 Triggering automation for form submission...", {
-            cardId: cardId,
-            pipeId: card.stage.pipe.id,
-            formId: formId,
-          });
-
-          const automationResult = await checkAndExecuteAutomations({
-            triggerType: "form_submission",
-            cardId: cardId,
-            pipeId: card.stage.pipe.id,
-            context: {
-              formId: formId,
-            },
-          });
-
-          console.log("✅ Automation executed:", automationResult);
-          console.log(`📊 Automation Report:
-  • Found: ${automationResult.automationsFound}
-  • Matched: ${automationResult.automationsMatched}
-  • Executed: ${automationResult.automationsExecuted?.length || 0}`);
-        } catch (error) {
-          console.error("❌ Error triggering automations:", error);
-          // Don't fail the form submission if automation fails
+          automationResult = await automationResponse.json();
+        } catch {
+          automationResult = null;
         }
+
+        if (!automationResponse.ok || automationResult?.success === false) {
+          console.error("Form submission automations failed", {
+            cardId,
+            formId,
+            submissionId,
+            status: automationResponse.status,
+            resultStatus: automationResult?.status,
+            error: automationResult?.error,
+            matchedCount: automationResult?.matchedCount,
+            succeededCount: automationResult?.succeededCount,
+            skippedCount: automationResult?.skippedCount,
+            failedCount: automationResult?.failedCount,
+          });
+        } else {
+          console.log("Form submission automations completed", {
+            cardId,
+            formId,
+            submissionId,
+            matchedCount: automationResult?.matchedCount,
+            succeededCount: automationResult?.succeededCount,
+            skippedCount: automationResult?.skippedCount,
+            failedCount: automationResult?.failedCount,
+          });
+        }
+      } catch (automationError: unknown) {
+        const message =
+          automationError instanceof Error
+            ? automationError.message
+            : "Unknown error";
+        console.error("Form submission automations request failed", {
+          cardId,
+          formId,
+          submissionId,
+          error: message,
+        });
       }
 
       setSubmitted(true);
