@@ -36,6 +36,23 @@ type Stage = {
 const RESEND_ERROR_FALLBACK_MESSAGE =
   "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
 
+const INBOX_EMAIL_PAGE_SIZE = 50;
+
+const INBOX_EMAIL_LIST_FIELDS = [
+  "id",
+  "direction",
+  "from",
+  "to",
+  "cc",
+  "subject",
+  "sentAt",
+  "read",
+  "status",
+  "statusUpdatedAt",
+  "bounceMessage",
+  "sentVia",
+];
+
 export default function KanbanPage() {
   const t = useTranslations('pipes');
   const tCommon = useTranslations('common');
@@ -77,13 +94,21 @@ export default function KanbanPage() {
   const [selectedInboxStages, setSelectedInboxStages] = useState<string[]>([]);
   const [tempSelectedInboxStages, setTempSelectedInboxStages] = useState<string[]>([]);
   const [isStageDropdownOpen, setIsStageDropdownOpen] = useState(false);
-  const [displayCount, setDisplayCount] = useState(20);
+  const [emailLimit, setEmailLimit] = useState(INBOX_EMAIL_PAGE_SIZE);
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
   const [openEmailMenuId, setOpenEmailMenuId] = useState<string | null>(null);
   const [emailToConfirmDelete, setEmailToConfirmDelete] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const emailRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const inboxLoadMoreLock = useRef(false);
+  const sawInboxLoadingRef = useRef(false);
+  const inboxQueryKeyRef = useRef<string | null>(null);
+  const inboxSnapshotRef = useRef<{ filterKey: string; emails: any[]; hasMore: boolean }>({
+    filterKey: "",
+    emails: [],
+    hasMore: false,
+  });
 
   // Compose email state
   const [showEmailCompose, setShowEmailCompose] = useState(false);
@@ -301,23 +326,81 @@ export default function KanbanPage() {
   // Query pipe with stages, cards, unread received emails, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
 
+  const inboxStageFilterKey = [...selectedInboxStages].sort().join(",");
+  const inboxFilterKey = `${pipeId}|${selectedFilter}|${inboxStageFilterKey}`;
+  const inboxQueryKey = `${inboxFilterKey}|${emailLimit}`;
+  let inboxQueryChanged = false;
+  if (inboxQueryKeyRef.current !== inboxQueryKey) {
+    inboxQueryKeyRef.current = inboxQueryKey;
+    sawInboxLoadingRef.current = false;
+    inboxQueryChanged = true;
+  }
+
   const inboxQuery =
     currentView === "inbox"
       ? {
-          pipes: {
-            $: { where: { id: pipeId } },
-            stages: {
-              cards: {
-                emails: {},
-                form_submissions: { form: {} },
-                fields: {},
+          card_emails: {
+            $: {
+              where: {
+                "card.pipe": pipeId,
+                ...(selectedFilter === "unread" ? { read: false } : {}),
+                ...(selectedInboxStages.length === 1
+                  ? { "card.stage": selectedInboxStages[0] }
+                  : selectedInboxStages.length > 1
+                    ? { "card.stage": { $in: [...selectedInboxStages].sort() } }
+                    : {}),
+              },
+              order: { sentAt: "desc" as const },
+              limit: emailLimit,
+              fields: INBOX_EMAIL_LIST_FIELDS,
+            },
+            card: {
+              $: { fields: ["id", "title"] },
+              stage: {
+                $: { fields: ["id", "name", "backgroundColor"] },
               },
             },
           },
         }
       : null;
 
-  const { data: inboxData } = db.useQuery(inboxQuery as any) as { data: any };
+  const {
+    isLoading: inboxLoading,
+    error: inboxError,
+    data: inboxData,
+    pageInfo: inboxPageInfo,
+  } = db.useQuery(inboxQuery as any) as {
+    isLoading: boolean;
+    error: { message?: string } | undefined;
+    data: any;
+    pageInfo: any;
+  };
+
+  const selectedCardId =
+    currentView === "inbox" && selectedEmail?.card?.id
+      ? (selectedEmail.card.id as string)
+      : null;
+
+  const selectedEmailDetailQuery = selectedCardId
+    ? {
+        cards: {
+          $: { where: { id: selectedCardId } },
+          emails: {},
+          fields: {},
+          form_submissions: { form: {} },
+        },
+      }
+    : null;
+
+  const {
+    isLoading: selectedEmailDetailLoading,
+    error: selectedEmailDetailError,
+    data: selectedEmailDetailData,
+  } = db.useQuery(selectedEmailDetailQuery as any) as {
+    isLoading: boolean;
+    error: { message?: string } | undefined;
+    data: any;
+  };
 
   const { user } = db.useAuth();
 
@@ -326,48 +409,75 @@ export default function KanbanPage() {
   const emailTemplates = pipe?.email_templates || [];
   const systemSettings = (data as any)?.system_settings?.[0];
 
-  // Process emails for inbox view from the inbox-only query (full payloads).
-  const allEmails: any[] = [];
-  if (currentView === "inbox") {
-    const inboxStages = inboxData?.pipes?.[0]?.stages || [];
-    inboxStages.forEach((stage: any) => {
-      stage.cards?.forEach((card: any) => {
-        card.emails?.forEach((email: any) => {
-          allEmails.push({
-            ...email,
-            card: {
+  const liveInboxEmails =
+    !inboxError &&
+    !inboxLoading &&
+    !inboxQueryChanged &&
+    Array.isArray(inboxData?.card_emails)
+      ? inboxData.card_emails
+      : inboxSnapshotRef.current.filterKey === inboxFilterKey
+        ? inboxSnapshotRef.current.emails
+        : [];
+
+  const seenInboxEmailIds = new Set<string>();
+  const sortedInboxEmails = liveInboxEmails
+    .map((email: any) => {
+      const card = Array.isArray(email?.card) ? email.card[0] : email?.card;
+      const stage = Array.isArray(card?.stage) ? card.stage[0] : card?.stage;
+      return {
+        id: email?.id,
+        direction: email?.direction,
+        from: email?.from,
+        to: email?.to,
+        cc: email?.cc,
+        subject: email?.subject,
+        sentAt: email?.sentAt,
+        read: email?.read,
+        status: email?.status,
+        statusUpdatedAt: email?.statusUpdatedAt,
+        bounceMessage: email?.bounceMessage,
+        sentVia: email?.sentVia,
+        card: card
+          ? {
               id: card.id,
               title: card.title,
-              description: card.description,
-              stage: {
-                id: stage.id,
-                name: stage.name,
-                backgroundColor: stage.backgroundColor,
-              },
-              fields: card.fields || [],
-              form_submissions: card.form_submissions || [],
-            },
-          });
-        });
-      });
+              stage: stage
+                ? {
+                    id: stage.id,
+                    name: stage.name,
+                    backgroundColor: stage.backgroundColor,
+                  }
+                : undefined,
+            }
+          : undefined,
+      };
+    })
+    .sort((a: any, b: any) => (b.sentAt || 0) - (a.sentAt || 0))
+    .filter((email: any) => {
+      if (!email?.id || seenInboxEmailIds.has(email.id)) return false;
+      seenInboxEmailIds.add(email.id);
+      return true;
     });
 
-    // Sort emails by sentAt descending
-    allEmails.sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
-  }
+  const reportedHasMore = inboxPageInfo?.card_emails?.hasNextPage;
+  const hasMoreInboxEmails =
+    typeof reportedHasMore === "boolean"
+      ? reportedHasMore
+      : !inboxLoading && sortedInboxEmails.length >= emailLimit
+        ? true
+        : inboxLoading && inboxSnapshotRef.current.filterKey === inboxFilterKey
+          ? inboxSnapshotRef.current.hasMore
+          : false;
 
-  // Filter emails for inbox
-  let filteredEmails = allEmails;
-  if (selectedFilter === "unread") {
-    filteredEmails = filteredEmails.filter((email) => !email.read);
-  }
-  if (selectedInboxStages.length > 0) {
-    filteredEmails = filteredEmails.filter((email) =>
-      selectedInboxStages.includes(email.card.stage.id)
-    );
-  }
+  const inboxResultReady =
+    !inboxError &&
+    !inboxLoading &&
+    !inboxQueryChanged &&
+    Array.isArray(inboxData?.card_emails);
 
-  const displayedEmails = filteredEmails.slice(0, displayCount);
+  const inboxListPending =
+    !inboxError && !inboxResultReady && sortedInboxEmails.length === 0;
+
   // Unread badge uses the slim board query so Kanban view still has a count
   // without loading full email bodies.
   const unreadCount = stages.reduce((total: number, stage: any) => {
@@ -383,9 +493,24 @@ export default function KanbanPage() {
       }, 0)
     );
   }, 0);
-  const selectedCardEmails = selectedEmail
-    ? allEmails.filter((email) => email.card.id === selectedEmail.card.id)
+
+  const selectedCardRecord = selectedCardId
+    ? selectedEmailDetailData?.cards?.[0]
+    : null;
+  const selectedCardEmails = selectedCardRecord
+    ? [...(selectedCardRecord.emails || [])].sort(
+        (a: any, b: any) => (b.sentAt || 0) - (a.sentAt || 0)
+      )
     : [];
+  const selectedConversationPending =
+    Boolean(selectedCardId) &&
+    !selectedEmailDetailError &&
+    !selectedCardRecord &&
+    (selectedEmailDetailLoading || selectedEmailDetailData == null);
+  const selectedConversationUnavailable =
+    Boolean(selectedCardId) &&
+    !selectedConversationPending &&
+    (Boolean(selectedEmailDetailError) || !selectedCardRecord);
 
   // Helper functions for inbox
   const formatDate = (timestamp: number) => {
@@ -449,13 +574,6 @@ export default function KanbanPage() {
     return details.length > 0 ? details.join(" | ") : undefined;
   };
 
-  const stripHtml = (html: string) => {
-    if (typeof window === 'undefined') return html;
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    return temp.textContent || temp.innerText || "";
-  };
-
   // Helper function to extract email addresses from "Name" <email@example.com> format
   const extractEmailAddresses = (emailString: string): string => {
     if (!emailString) return "";
@@ -505,18 +623,20 @@ export default function KanbanPage() {
       setShowBcc(!!template.bcc);
 
       const card = selectedEmail.card;
-      const inboxCard = inboxData?.pipes?.[0]?.stages
-        ?.flatMap((s: any) => s.cards || [])
-        .find((c: any) => c.id === card.id);
-      const stage = stages.find((s: any) => s.id === card.stage.id);
-      const formSubmissions = (inboxCard?.form_submissions || card.form_submissions || []).sort((a: any, b: any) => b.submittedAt - a.submittedAt);
+      const stage = stages.find((s: any) => s.id === card?.stage?.id);
+      const formSubmissions = [...(selectedCardRecord?.form_submissions || [])]
+        .map((submission: any) => ({
+          ...submission,
+          form: Array.isArray(submission?.form) ? submission.form[0] : submission?.form,
+        }))
+        .sort((a: any, b: any) => (b.submittedAt || 0) - (a.submittedAt || 0));
       const clientForms = (stage?.forms || []).filter((f: any) => f.formType !== "admin");
-      const cardFields = inboxCard?.fields || card.fields || [];
+      const cardFields = selectedCardRecord?.fields || [];
 
       const processedSubject = replacePlaceholders(template.subject, {
         card: {
-          title: card.title,
-          description: card.description,
+          title: selectedCardRecord?.title || card?.title,
+          description: selectedCardRecord?.description,
           fields: cardFields,
         },
         stage: {
@@ -528,13 +648,13 @@ export default function KanbanPage() {
         formSubmissions: formSubmissions,
         globalVariables: systemSettings?.globalVariables || [],
         clientForms: clientForms,
-        cardId: card.id,
+        cardId: card?.id,
       });
 
       const processedBody = replacePlaceholders(template.body, {
         card: {
-          title: card.title,
-          description: card.description,
+          title: selectedCardRecord?.title || card?.title,
+          description: selectedCardRecord?.description,
           fields: cardFields,
         },
         stage: {
@@ -546,7 +666,7 @@ export default function KanbanPage() {
         formSubmissions: formSubmissions,
         globalVariables: systemSettings?.globalVariables || [],
         clientForms: clientForms,
-        cardId: card.id,
+        cardId: card?.id,
       });
 
       setEmailSubject(processedSubject);
@@ -697,25 +817,61 @@ export default function KanbanPage() {
     }
   }, [showManageMenu]);
 
-  // Inbox useEffects
-  // Infinite scroll handler
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    if (scrollTop + clientHeight >= scrollHeight - 100) {
-      if (displayCount < filteredEmails.length) {
-        setDisplayCount((prev) => prev + 20);
-      }
-    }
-  };
+  useEffect(() => {
+    setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
+  }, [selectedFilter, inboxStageFilterKey]);
 
   useEffect(() => {
-    const scrollEl = scrollRef.current;
-    if (scrollEl && currentView === "inbox") {
-      scrollEl.addEventListener("scroll", handleScroll);
-      return () => scrollEl.removeEventListener("scroll", handleScroll);
+    if (currentView !== "inbox") return;
+    if (inboxError) return;
+    if (inboxLoading || !inboxData) {
+      sawInboxLoadingRef.current = true;
+      return;
     }
-  }, [displayCount, filteredEmails.length, currentView]);
+    if (!sawInboxLoadingRef.current) return;
+    sawInboxLoadingRef.current = false;
+    const hasNext = inboxPageInfo?.card_emails?.hasNextPage;
+    const emails = inboxData.card_emails || [];
+    inboxSnapshotRef.current = {
+      filterKey: inboxFilterKey,
+      emails,
+      hasMore: typeof hasNext === "boolean" ? hasNext : emails.length >= emailLimit,
+    };
+  }, [
+    currentView,
+    inboxError,
+    inboxLoading,
+    inboxData,
+    inboxPageInfo,
+    inboxFilterKey,
+    emailLimit,
+  ]);
+
+  useEffect(() => {
+    inboxLoadMoreLock.current = false;
+  }, [inboxData, inboxError]);
+
+  const loadMoreInboxEmails = useCallback(() => {
+    if (inboxLoadMoreLock.current || inboxLoading || !hasMoreInboxEmails) return;
+    inboxLoadMoreLock.current = true;
+    setEmailLimit((current) => current + INBOX_EMAIL_PAGE_SIZE);
+  }, [inboxLoading, hasMoreInboxEmails]);
+
+  // Inbox useEffects
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl || currentView !== "inbox") return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+      if (scrollTop + clientHeight >= scrollHeight - 100) {
+        loadMoreInboxEmails();
+      }
+    };
+
+    scrollEl.addEventListener("scroll", handleScroll);
+    return () => scrollEl.removeEventListener("scroll", handleScroll);
+  }, [currentView, loadMoreInboxEmails]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1074,7 +1230,12 @@ export default function KanbanPage() {
                       Kanban
                     </button>
                     <button
-                      onClick={() => setCurrentView("inbox")}
+                      onClick={() => {
+                        if (currentView !== "inbox") {
+                          setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
+                        }
+                        setCurrentView("inbox");
+                      }}
                       className={`pb-1 text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer ${
                         currentView === "inbox"
                           ? "text-blue-600 border-b-2 border-blue-600"
@@ -1493,7 +1654,10 @@ export default function KanbanPage() {
                 {/* Navigation buttons */}
                 <div className="p-4 flex flex-col gap-3">
                 <button
-                  onClick={() => setSelectedFilter("all")}
+                  onClick={() => {
+                    setSelectedFilter("all");
+                    setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
+                  }}
                   className={`px-2 py-2 rounded-lg text-left text-xs font-medium transition-colors flex items-center gap-1.5 ${
                     selectedFilter === "all"
                       ? "bg-blue-100 text-blue-700"
@@ -1507,7 +1671,10 @@ export default function KanbanPage() {
                 </button>
 
                 <button
-                  onClick={() => setSelectedFilter("unread")}
+                  onClick={() => {
+                    setSelectedFilter("unread");
+                    setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
+                  }}
                   className={`px-2 py-2 rounded-lg text-left text-xs font-medium transition-colors flex items-center justify-between gap-1 ${
                     selectedFilter === "unread"
                       ? "bg-blue-100 text-blue-700"
@@ -1583,7 +1750,7 @@ export default function KanbanPage() {
                             onClick={() => {
                               setSelectedInboxStages(tempSelectedInboxStages);
                               setIsStageDropdownOpen(false);
-                              setDisplayCount(20);
+                              setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
                             }}
                             className="flex-1 px-2 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 font-medium"
                           >
@@ -1609,7 +1776,7 @@ export default function KanbanPage() {
                       <button
                         onClick={() => {
                           setSelectedInboxStages([]);
-                          setDisplayCount(20);
+                          setEmailLimit(INBOX_EMAIL_PAGE_SIZE);
                         }}
                         className="text-xs text-blue-600 hover:text-blue-800"
                       >
@@ -1621,12 +1788,21 @@ export default function KanbanPage() {
 
                 {/* Email List */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto">
-                  {displayedEmails.length === 0 ? (
+                  {inboxError ? (
+                    <div className="p-8 text-center text-red-600">
+                      <p className="text-sm">Unable to load emails.</p>
+                    </div>
+                  ) : inboxListPending ? (
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                      <p className="text-xs text-gray-500 mt-2">{tCommon('loading')}</p>
+                    </div>
+                  ) : sortedInboxEmails.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
                       <p>{tInbox('noEmails')}</p>
                     </div>
                   ) : (
-                    displayedEmails.map((email: any) => (
+                    sortedInboxEmails.map((email: any) => (
                       <div
                         key={email.id}
                         onClick={async () => {
@@ -1656,21 +1832,35 @@ export default function KanbanPage() {
                           </span>
                         </div>
                         <div className="text-xs text-gray-900 truncate mb-1">{email.subject}</div>
-                        <div className="text-xs text-gray-600 line-clamp-2 mb-1">{stripHtml(email.body)}</div>
                         <div className="flex items-center gap-1">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: email.card?.stage?.backgroundColor || "#e5e7eb" }}
+                            title={email.card?.stage?.name || ""}
+                          />
                           <svg className="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
                           <span className="text-xs text-gray-600 bg-gray-200 rounded px-1 py-0.5 truncate">
-                            {email.card.title}
+                            {email.card?.title}
                           </span>
                         </div>
                       </div>
                     ))
                   )}
-                  {displayCount < filteredEmails.length && (
+                  {!inboxError && !inboxListPending && hasMoreInboxEmails && (
                     <div className="p-4 text-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                      {inboxLoading ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={loadMoreInboxEmails}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          Load more
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1685,7 +1875,7 @@ export default function KanbanPage() {
                 ) : (
                   <div className="p-6">
                     <h2 className="text-base font-bold mb-4">
-                      {tInbox('emailsFor')}: {selectedEmail.card.title}
+                      {tInbox('emailsFor')}: {selectedCardRecord?.title || selectedEmail.card?.title}
                     </h2>
 
                     {/* Compose Email Box */}
@@ -2062,6 +2252,13 @@ export default function KanbanPage() {
                       </>
                     )}
 
+                    {selectedConversationUnavailable ? (
+                      <p className="text-sm text-red-600">Unable to load this conversation.</p>
+                    ) : selectedConversationPending ? (
+                      <div className="py-8 text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                      </div>
+                    ) : (
                     <div className="space-y-4">
                       {selectedCardEmails.map((email: any) => (
                         <div
@@ -2280,6 +2477,7 @@ export default function KanbanPage() {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2298,12 +2496,12 @@ export default function KanbanPage() {
                       className="bg-white rounded-lg shadow p-3 hover:shadow-md transition-shadow cursor-pointer mb-6"
                     >
                       {/* Card Title */}
-                      <h3 className="font-bold text-gray-900 text-sm mb-2">{selectedEmail.card.title}</h3>
+                      <h3 className="font-bold text-gray-900 text-sm mb-2">{selectedCardRecord?.title || selectedEmail.card?.title}</h3>
 
                       {/* Only visible fields */}
-                      {selectedEmail.card.fields && selectedEmail.card.fields.length > 0 && (
+                      {selectedCardRecord?.fields && selectedCardRecord.fields.length > 0 && (
                         <div className="space-y-1 text-xs">
-                          {selectedEmail.card.fields
+                          {selectedCardRecord.fields
                             .filter((field: any) => visibleFields.has(field.key))
                             .map((field: any) => (
                               <div key={field.key} className="flex items-start gap-2">
@@ -2325,10 +2523,10 @@ export default function KanbanPage() {
                       <div
                         className="px-3 py-2 rounded-lg text-sm font-medium"
                         style={{
-                          backgroundColor: selectedEmail.card.stage.backgroundColor || "#e5e7eb",
+                          backgroundColor: selectedEmail.card?.stage?.backgroundColor || "#e5e7eb",
                         }}
                       >
-                        {selectedEmail.card.stage.name}
+                        {selectedEmail.card?.stage?.name}
                       </div>
                     </div>
 
