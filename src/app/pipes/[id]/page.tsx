@@ -263,9 +263,14 @@ export default function KanbanPage() {
   // Load display settings before the board query so InstantDB does not
   // subscribe without fields and then resubscribe with a field filter.
   useEffect(() => {
-    fetch("/api/kanban-display")
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let cancelled = false;
+
+    fetch("/api/kanban-display", { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
+        if (cancelled) return;
         const visible = new Set<string>(
           (Array.isArray(data.settings) ? data.settings : [])
             .filter((s: any) => s.showOnCard)
@@ -275,10 +280,22 @@ export default function KanbanPage() {
         setKanbanDisplayLoaded(true);
       })
       .catch(err => {
-        console.error("Failed to load display settings:", err);
+        if (cancelled) return;
+        if (err?.name !== "AbortError") {
+          console.error("Failed to load display settings:", err);
+        }
         setVisibleFields(new Set());
         setKanbanDisplayLoaded(true);
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
       });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   const sensors = useSensors(
@@ -313,6 +330,7 @@ export default function KanbanPage() {
               direction: "received",
               read: false,
             },
+            fields: ["id", "direction", "read"],
           },
         };
 
