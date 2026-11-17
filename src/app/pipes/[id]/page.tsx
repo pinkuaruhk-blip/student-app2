@@ -37,6 +37,7 @@ const RESEND_ERROR_FALLBACK_MESSAGE =
   "Email could not be sent by Resend. Please check the recipient address and Resend dashboard.";
 
 const INBOX_EMAIL_PAGE_SIZE = 50;
+const BOARD_LOAD_TIMEOUT_MS = 15000;
 
 const INBOX_EMAIL_LIST_FIELDS = [
   "id",
@@ -72,6 +73,13 @@ export default function KanbanPage() {
   const [hoveredStageId, setHoveredStageId] = useState<string | null>(null);
   const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set());
   const [kanbanDisplayLoaded, setKanbanDisplayLoaded] = useState(false);
+  const [boardLoadTimedOut, setBoardLoadTimedOut] = useState(false);
+  const connectionStatus = db.useConnectionStatus();
+  const connectionStatusRef = useRef(connectionStatus);
+  connectionStatusRef.current = connectionStatus;
+  const boardQueryStartedAtRef = useRef<number | null>(null);
+  const boardLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loggedBoardResultRef = useRef(false);
   const [formBuilderStageId, setFormBuilderStageId] = useState<string | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -343,6 +351,52 @@ export default function KanbanPage() {
 
   // Query pipe with stages, cards, unread received emails, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
+
+  // boardQuery is a new object on every render. Time from when the subscription
+  // is allowed to start, and do not restart the timer on later renders.
+  useEffect(() => {
+    if (!kanbanDisplayLoaded) return;
+
+    const startedAt = performance.now();
+    boardQueryStartedAtRef.current = startedAt;
+    loggedBoardResultRef.current = false;
+    setBoardLoadTimedOut(false);
+
+    boardLoadTimeoutRef.current = setTimeout(() => {
+      boardLoadTimeoutRef.current = null;
+      const status = connectionStatusRef.current;
+      console.info("[kanban] board subscription still waiting", {
+        elapsedMs: Math.round(performance.now() - startedAt),
+        connectionStatus: status,
+      });
+      setBoardLoadTimedOut(true);
+    }, BOARD_LOAD_TIMEOUT_MS);
+
+    return () => {
+      if (boardLoadTimeoutRef.current) {
+        clearTimeout(boardLoadTimeoutRef.current);
+        boardLoadTimeoutRef.current = null;
+      }
+    };
+  }, [kanbanDisplayLoaded, pipeId]);
+
+  useEffect(() => {
+    if (!kanbanDisplayLoaded) return;
+    if (data == null && error == null) return;
+    if (loggedBoardResultRef.current) return;
+    loggedBoardResultRef.current = true;
+    if (boardLoadTimeoutRef.current) {
+      clearTimeout(boardLoadTimeoutRef.current);
+      boardLoadTimeoutRef.current = null;
+    }
+    const startedAt = boardQueryStartedAtRef.current;
+    console.info("[kanban] board subscription result", {
+      elapsedMs: startedAt == null ? null : Math.round(performance.now() - startedAt),
+      connectionStatus: connectionStatusRef.current,
+      hasError: error != null,
+    });
+    setBoardLoadTimedOut(false);
+  }, [kanbanDisplayLoaded, pipeId, data, error]);
 
   const inboxStageFilterKey = [...selectedInboxStages].sort().join(",");
   const inboxFilterKey = `${pipeId}|${selectedFilter}|${inboxStageFilterKey}`;
@@ -1105,6 +1159,23 @@ export default function KanbanPage() {
     : null;
 
   if (!kanbanDisplayLoaded || isLoading || (!error && data == null)) {
+    if (kanbanDisplayLoaded && boardLoadTimedOut) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <p className="text-gray-900 mb-2">The board is still loading.</p>
+            <p className="text-gray-600 mb-4">Connection: {connectionStatus}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
