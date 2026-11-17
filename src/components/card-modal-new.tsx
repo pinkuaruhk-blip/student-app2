@@ -829,7 +829,19 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
   const handleSubmitAdminForm = async (formId: string, formFields: any[]) => {
     // Validate required fields
     for (const field of formFields) {
-      if (field.type !== "content" && field.required && !adminFormResponses[field.name]) {
+      if (field.type === "content" || !field.required) continue;
+      if (field.type === "number") {
+        const value = adminFormResponses[field.name];
+        if (value === undefined || value === null || String(value).trim() === "") {
+          alert(`Please fill in the required field: ${field.label}`);
+          return;
+        }
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) {
+          alert(`Please enter a number greater than 0: ${field.label}`);
+          return;
+        }
+      } else if (!adminFormResponses[field.name]) {
         alert(`Please fill in the required field: ${field.label}`);
         return;
       }
@@ -888,7 +900,19 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
   const handleSubmitClientForm = async (formId: string, formFields: any[]) => {
     // Validate required fields
     for (const field of formFields) {
-      if (field.type !== "content" && field.required && !clientFormResponses[field.name]) {
+      if (field.type === "content" || !field.required) continue;
+      if (field.type === "number") {
+        const value = clientFormResponses[field.name];
+        if (value === undefined || value === null || String(value).trim() === "") {
+          alert(`Please fill in the required field: ${field.label}`);
+          return;
+        }
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) {
+          alert(`Please enter a number greater than 0: ${field.label}`);
+          return;
+        }
+      } else if (!clientFormResponses[field.name]) {
         alert(`Please fill in the required field: ${field.label}`);
         return;
       }
@@ -2440,6 +2464,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                             ...adminFormResponses,
                                             [field.name]: e.target.value,
                                           })}
+                                          min={field.type === "number" && field.required ? 1 : undefined}
                                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                         />
                                       )}
@@ -2649,6 +2674,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
                                             type={field.type}
                                             value={clientFormResponses[field.name] || ""}
                                             onChange={(e) => setClientFormResponses({...clientFormResponses, [field.name]: e.target.value})}
+                                            min={field.type === "number" && field.required ? 1 : undefined}
                                             className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
                                           />
                                         )

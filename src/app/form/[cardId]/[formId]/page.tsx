@@ -367,8 +367,21 @@ export default function PublicFormPage({ params }: PageProps) {
       // Check if field is visible based on conditions
       const isVisible = evaluateFieldVisibility(field, responses);
 
-      // Only validate if field is visible and required
-      if (isVisible && field.required && !responses[field.name]) {
+      // Only validate if field is visible and required.
+      // A required number must be greater than 0. "0" is non-empty, so it
+      // cannot share the blank check.
+      if (isVisible && field.required && field.type === "number") {
+        const value = responses[field.name];
+        if (value === undefined || value === null || String(value).trim() === "") {
+          alert(`Please fill in the required field: ${field.label}`);
+          return;
+        }
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) {
+          alert(`Please enter a number greater than 0: ${field.label}`);
+          return;
+        }
+      } else if (isVisible && field.required && !responses[field.name]) {
         alert(`Please fill in the required field: ${field.label}`);
         return;
       }
@@ -617,9 +630,22 @@ export default function PublicFormPage({ params }: PageProps) {
                 {field.type === "number" && (
                   <input
                     type="number"
+                    // A required number is checked in handleSubmit. Keeping it out of
+                    // this form's native validation lets blank and 0 reach those messages.
+                    form={field.required ? "number-checked-in-handle-submit" : undefined}
                     value={responses[field.name] || ""}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    onKeyDown={
+                      field.required
+                        ? (event) => {
+                            if (event.key !== "Enter") return;
+                            event.preventDefault();
+                            event.currentTarget.closest("form")?.requestSubmit();
+                          }
+                        : undefined
+                    }
                     required={field.required}
+                    min={field.required ? 1 : undefined}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 )}
