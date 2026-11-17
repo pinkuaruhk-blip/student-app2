@@ -39,6 +39,13 @@ const RESEND_ERROR_FALLBACK_MESSAGE =
 const INBOX_EMAIL_PAGE_SIZE = 50;
 const BOARD_LOAD_TIMEOUT_MS = 15000;
 
+function boardQueryFailureText(error: any): string | null {
+  if (error == null) return null;
+  if (typeof error === "string" && error) return error;
+  if (typeof error?.message === "string" && error.message) return error.message;
+  return "Unknown query error";
+}
+
 const INBOX_EMAIL_LIST_FIELDS = [
   "id",
   "direction",
@@ -394,6 +401,8 @@ export default function KanbanPage() {
       elapsedMs: startedAt == null ? null : Math.round(performance.now() - startedAt),
       connectionStatus: connectionStatusRef.current,
       hasError: error != null,
+      errorMessage: boardQueryFailureText(error),
+      pipeCount: Array.isArray(data?.pipes) ? data.pipes.length : null,
     });
     setBoardLoadTimedOut(false);
   }, [kanbanDisplayLoaded, pipeId, data, error]);
@@ -1187,10 +1196,12 @@ export default function KanbanPage() {
   }
 
   if (error || !pipe) {
+    const boardErrorDetail = boardQueryFailureText(error) ?? "No pipe returned.";
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{t('errorLoading')}</p>
+        <div className="text-center px-4">
+          <p className="text-red-600 mb-2">{t('errorLoading')}</p>
+          <p className="text-gray-700 mb-4 max-w-lg mx-auto break-words">{boardErrorDetail}</p>
           <Link href="/pipes" className="text-blue-600 hover:underline">
             {t('backToPipes')}
           </Link>
