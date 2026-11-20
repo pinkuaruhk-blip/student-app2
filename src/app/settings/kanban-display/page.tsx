@@ -14,31 +14,54 @@ export default function KanbanDisplayPage() {
   const [displaySettings, setDisplaySettings] = useState<FieldDisplay[]>([]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  // Load n8n field definitions and display settings
+  // Load field definitions and saved display choices independently.
   useEffect(() => {
-    // Load field definitions
-    fetch("/api/n8n-fields")
-      .then(res => res.json())
-      .then(data => {
-        if (data.fields) {
-          const fieldNames = data.fields.map((f: any) => f.name);
-          setAvailableFields(fieldNames);
+    let cancelled = false;
 
-          // Load display settings
-          return fetch("/api/kanban-display");
+    Promise.all([
+      fetch("/api/n8n-fields").then((res) => {
+        if (!res.ok) throw new Error("Failed to load field definitions");
+        return res.json();
+      }),
+      fetch("/api/kanban-display").then((res) => {
+        if (!res.ok) throw new Error("Failed to load display settings");
+        return res.json();
+      }),
+    ])
+      .then(([fieldsData, displayData]) => {
+        if (cancelled) return;
+        const names = Array.isArray(fieldsData.fields)
+          ? fieldsData.fields
+              .map((field: any) => field?.name)
+              .filter((name: any) => typeof name === "string" && name)
+          : [];
+        let rawSettings = displayData.settings;
+        if (typeof rawSettings === "string") {
+          try {
+            rawSettings = JSON.parse(rawSettings);
+          } catch {
+            rawSettings = [];
+          }
         }
+        const settings = Array.isArray(rawSettings)
+          ? rawSettings.flatMap((item: any) => {
+              const fieldName = item?.fieldName || item?.name;
+              if (typeof fieldName !== "string" || !fieldName) return [];
+              return [{ fieldName, showOnCard: item?.showOnCard !== false }];
+            })
+          : [];
+        const savedNames = settings
+          .map((setting) => setting.fieldName)
+          .filter((name) => !names.includes(name));
+        setAvailableFields([...names, ...savedNames]);
+        setDisplaySettings(settings);
       })
-      .then(res => res?.json())
-      .then(data => {
-        if (data?.settings) {
-          setDisplaySettings(data.settings);
-        } else {
-          // Initialize with all fields shown by default
-          setDisplaySettings(availableFields.map(name => ({ fieldName: name, showOnCard: true })));
-        }
-      })
-      .catch(err => console.error("Failed to load settings:", err));
-  }, [availableFields.length]); // Re-run when fields change
+      .catch((err) => console.error("Failed to load settings:", err));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const saveSettings = async (newSettings: FieldDisplay[]) => {
     setSaveStatus("saving");
@@ -61,17 +84,11 @@ export default function KanbanDisplayPage() {
   };
 
   const handleToggleField = (fieldName: string) => {
-    const newSettings = displaySettings.map(setting =>
-      setting.fieldName === fieldName
-        ? { ...setting, showOnCard: !setting.showOnCard }
-        : setting
-    );
-
-    // If field doesn't exist in settings yet, add it
-    if (!newSettings.find(s => s.fieldName === fieldName)) {
-      newSettings.push({ fieldName, showOnCard: true });
-    }
-
+    const currentlyVisible = isFieldVisible(fieldName);
+    const newSettings = availableFields.map((name) => ({
+      fieldName: name,
+      showOnCard: name === fieldName ? !currentlyVisible : isFieldVisible(name),
+    }));
     saveSettings(newSettings);
   };
 
@@ -86,8 +103,9 @@ export default function KanbanDisplayPage() {
   };
 
   const isFieldVisible = (fieldName: string) => {
-    const setting = displaySettings.find(s => s.fieldName === fieldName);
-    return setting?.showOnCard ?? true; // Default to true if not found
+    const setting = displaySettings.find((item) => item.fieldName === fieldName);
+    if (setting) return setting.showOnCard;
+    return displaySettings.length === 0;
   };
 
   return (
@@ -149,7 +167,7 @@ export default function KanbanDisplayPage() {
                 {/* Quick Actions */}
                 <div className="bg-white rounded-lg shadow p-4 mb-6 flex justify-between items-center">
                   <div className="text-sm text-gray-600">
-                    {displaySettings.filter(s => s.showOnCard).length} of {availableFields.length} fields visible
+                    {availableFields.filter((name) => isFieldVisible(name)).length} of {availableFields.length} fields visible
                   </div>
                   <div className="flex gap-2">
                     <button

@@ -20,7 +20,10 @@ export async function GET() {
     return NextResponse.json({ settings: kanbanDisplaySettings });
   } catch (error: any) {
     console.error("Failed to read Kanban display settings:", error);
-    return NextResponse.json({ settings: [] });
+    return NextResponse.json(
+      { error: "Failed to read Kanban display settings", details: error?.message },
+      { status: 500 }
+    );
   }
 }
 
