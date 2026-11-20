@@ -87,7 +87,6 @@ export default function KanbanPage() {
   const boardQueryStartedAtRef = useRef<number | null>(null);
   const boardLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loggedBoardResultRef = useRef(false);
-  const loggedCardFieldsKeyRef = useRef<string | null>(null);
   const [formBuilderStageId, setFormBuilderStageId] = useState<string | null>(null);
   const [fieldDefinitions, setFieldDefinitions] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,25 +321,31 @@ export default function KanbanPage() {
     })
   );
 
-  // Sorted so the fields-query hash does not depend on settings API order.
-  // Checked keys only: loading every field record destabilizes large pipes.
-  // Full fields still load per card in CardModalNew.
-  const visibleFieldKeys = [...visibleFields].sort();
-
-  // Pass null until Kanban Display settings resolve so the fields subscription
-  // starts once, with the real key list, instead of resubscribing.
+  // Build query object dynamically for board data loading.
+  // Pass null until Kanban Display settings resolve so the first real
+  // InstantDB subscription already includes the correct field filter.
   const boardQuery = kanbanDisplayLoaded
     ? (() => {
         const pipeFilter: any = { $: { where: { id: pipeId } } };
-        const cardsNested: any = {
-          emails: {
-            $: {
-              where: {
-                direction: "received",
-                read: false,
-              },
-              fields: ["id", "direction", "read"],
+
+        const cardsNested: any = {};
+
+        // Only load field records the user has checked in Field Visibility settings.
+        // Loading all fields (e.g. 3,968 records) destabilizes the InstantDB realtime
+        // subscription for large pipes. Full fields are loaded per-card in CardModalNew.
+        const visibleFieldKeys = [...visibleFields];
+        if (visibleFieldKeys.length > 0) {
+          cardsNested.fields = {
+            $: { where: { key: { $in: visibleFieldKeys } } },
+          };
+        }
+        cardsNested.emails = {
+          $: {
+            where: {
+              direction: "received",
+              read: false,
             },
+            fields: ["id", "direction", "read"],
           },
         };
 
@@ -351,41 +356,8 @@ export default function KanbanPage() {
       })()
     : null;
 
-  // Field rows are a separate add-query so they get their own 5s budget.
-  // The board does not wait on this hook: useQuery(null) reports isLoading true.
-  const cardFieldsQuery =
-    kanbanDisplayLoaded && visibleFieldKeys.length > 0
-      ? {
-          card_fields: {
-            $: {
-              where: {
-                "card.pipe": pipeId,
-                key: { $in: visibleFieldKeys },
-              },
-            },
-            card: { $: { fields: ["id"] } },
-          },
-        }
-      : null;
-
-  // Query pipe with stages, cards, and unread received emails.
+  // Query pipe with stages, cards, unread received emails, and only visible fields
   const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
-  const { error: cardFieldsError, data: cardFieldsData } = db.useQuery(cardFieldsQuery as any) as {
-    error: any;
-    data: any;
-  };
-
-  const fieldsByCardId = new Map<string, any[]>();
-  if (!cardFieldsError && Array.isArray(cardFieldsData?.card_fields)) {
-    for (const row of cardFieldsData.card_fields) {
-      const linkedCard = Array.isArray(row?.card) ? row.card[0] : row?.card;
-      const cardId = linkedCard?.id;
-      if (!cardId) continue;
-      const existing = fieldsByCardId.get(cardId);
-      if (existing) existing.push(row);
-      else fieldsByCardId.set(cardId, [row]);
-    }
-  }
 
   // boardQuery is a new object on every render. Time from when the subscription
   // is allowed to start, and do not restart the timer on later renders.
@@ -434,30 +406,6 @@ export default function KanbanPage() {
     });
     setBoardLoadTimedOut(false);
   }, [kanbanDisplayLoaded, pipeId, data, error]);
-
-  const visibleFieldKey = visibleFieldKeys.join(",");
-  useEffect(() => {
-    if (cardFieldsQuery == null) return;
-    if (cardFieldsData == null && cardFieldsError == null) return;
-    const logKey = `${pipeId}|${visibleFieldKey}`;
-    if (loggedCardFieldsKeyRef.current === logKey) return;
-    loggedCardFieldsKeyRef.current = logKey;
-    const rows = Array.isArray(cardFieldsData?.card_fields) ? cardFieldsData.card_fields : [];
-    let linkedCount = 0;
-    const seen = new Set<string>();
-    for (const row of rows) {
-      const linkedCard = Array.isArray(row?.card) ? row.card[0] : row?.card;
-      if (!linkedCard?.id || seen.has(linkedCard.id)) continue;
-      seen.add(linkedCard.id);
-      linkedCount += 1;
-    }
-    console.info("[kanban] card fields subscription result", {
-      count: rows.length,
-      linkedCardCount: linkedCount,
-      hasError: cardFieldsError != null,
-      errorMessage: boardQueryFailureText(cardFieldsError),
-    });
-  }, [cardFieldsQuery, cardFieldsData, cardFieldsError, pipeId, visibleFieldKey]);
 
   const inboxStageFilterKey = [...selectedInboxStages].sort().join(",");
   const inboxFilterKey = `${pipeId}|${selectedFilter}|${inboxStageFilterKey}`;
@@ -1614,7 +1562,7 @@ export default function KanbanPage() {
                         // Show normal cards list
                         filteredCards.map((card: any) => {
                         // Sort fields by position
-                        const sortedFields = [...(fieldsByCardId.get(card.id) || [])].sort((a: any, b: any) =>
+                        const sortedFields = (card.fields || []).sort((a: any, b: any) =>
                           (a.position ?? 0) - (b.position ?? 0)
                         );
 
@@ -1683,7 +1631,7 @@ export default function KanbanPage() {
                                     card: {
                                       title: card.title,
                                       description: card.description,
-                                      fields: fieldsByCardId.get(card.id) || [],
+                                      fields: card.fields || [],
                                     },
                                   }),
                                 }}
