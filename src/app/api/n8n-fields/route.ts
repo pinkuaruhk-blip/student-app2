@@ -29,10 +29,7 @@ export async function GET() {
     return NextResponse.json({ fields });
   } catch (error: any) {
     console.error("Failed to read field definitions:", error);
-    return NextResponse.json(
-      { error: "Failed to read field definitions", details: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ fields: [] });
   }
 }
 
