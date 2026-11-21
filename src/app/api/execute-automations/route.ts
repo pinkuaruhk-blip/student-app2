@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { internalHeaders, requireStaffOrServer } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 
 // Initialize InstantDB Admin SDK locally
@@ -15,6 +16,9 @@ const db = init({
 });
 
 export async function POST(request: NextRequest) {
+  const caller = await requireStaffOrServer(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     // Check if admin key is configured
     if (!ADMIN_KEY) {
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
                   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
                   await fetch(`${baseUrl}/api/execute-automations`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", ...internalHeaders() },
                     body: JSON.stringify({
                       triggerType: "card_enters_stage",
                       cardId,
@@ -195,7 +199,7 @@ export async function POST(request: NextRequest) {
 
             const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", ...internalHeaders() },
               body: JSON.stringify({
                 to: recipientEmail,
                 from: template.fromEmail || undefined,

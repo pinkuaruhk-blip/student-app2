@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, requireStaffOrServer } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 import {
@@ -154,6 +155,9 @@ function resolveEffectiveSender(
  * Sends email via Resend and logs the email to the database for tracking
  */
 export async function POST(request: NextRequest) {
+  const caller = await requireStaffOrServer(request);
+  if (caller instanceof NextResponse) return caller;
+
   const debugLogs: string[] = [];
   const log = (message: string, value?: string | number | boolean | null) => {
     if (value === undefined) {
@@ -550,6 +554,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for documentation
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   const defaultFromEmail = process.env.DEFAULT_FROM_EMAIL;
   return NextResponse.json({
     message: "Send Email API Endpoint",

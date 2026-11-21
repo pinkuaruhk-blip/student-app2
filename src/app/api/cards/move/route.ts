@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, requireN8nSecret } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 
 // Initialize InstantDB Admin SDK
@@ -20,24 +21,17 @@ const db = init({
  * Move a card to a different stage (for n8n automation)
  */
 export async function POST(request: NextRequest) {
+  const denied = requireN8nSecret(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
-    const { cardId, stageId, secret } = body;
+    const { cardId, stageId } = body;
 
     console.log("=== Move Card Request ===");
     console.log("Card ID:", cardId);
     console.log("New Stage ID:", stageId);
     console.log("========================");
-
-    // Optional: Verify secret
-    const expectedSecret = process.env.N8N_SHARED_SECRET;
-    if (expectedSecret && secret && secret !== expectedSecret) {
-      console.warn("Secret mismatch");
-      return NextResponse.json(
-        { error: "Invalid secret" },
-        { status: 401 }
-      );
-    }
 
     if (!ADMIN_KEY) {
       return NextResponse.json(
@@ -103,6 +97,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for documentation
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   return NextResponse.json({
     message: "Move Card API Endpoint",
     method: "POST",

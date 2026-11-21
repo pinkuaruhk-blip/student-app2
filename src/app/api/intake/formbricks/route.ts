@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, internalHeaders } from "@/lib/staff-auth";
 import { init, id } from "@instantdb/admin";
 
 // Initialize InstantDB Admin SDK
@@ -99,6 +100,9 @@ async function fetchSurveyFieldLabels(surveyId: string): Promise<Record<string, 
  * Supports multiple payload formats and logs everything for debugging
  */
 export async function POST(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const body = await request.json();
 
@@ -326,7 +330,7 @@ export async function POST(request: NextRequest) {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
       const automationResponse = await fetch(`${baseUrl}/api/execute-automations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...internalHeaders() },
         body: JSON.stringify({
           triggerType: "card_enters_stage",
           cardId,
@@ -360,6 +364,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for testing - shows what IDs are needed
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   const pipeId = request.nextUrl.searchParams.get("pipeId");
   const stageId = request.nextUrl.searchParams.get("stageId");
 

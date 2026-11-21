@@ -239,7 +239,7 @@ export function CardModal({ card, onClose }: CardModalProps) {
     setEmailError("");
 
     try {
-      const response = await fetch("/api/send-email", {
+      const response = await staffFetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -5,6 +5,7 @@
  */
 
 import { db } from "./db";
+import { staffFetch } from "@/lib/staff-fetch";
 import { id as generateId } from "@instantdb/react";
 import { processEmailTemplate, getFormLink } from "./email-templates";
 
@@ -637,7 +638,7 @@ async function executeSendFormLinkAction(
   }
 
   // Send via API
-  const response = await fetch("/api/send-email", {
+  const response = await staffFetch("/api/send-email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -732,7 +733,7 @@ async function executeSendEmailAction(
   const subject = processEmailTemplate(template.subject, emailData);
   const body = processEmailTemplate(template.body, emailData);
 
-  const response = await fetch("/api/send-email", {
+  const response = await staffFetch("/api/send-email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

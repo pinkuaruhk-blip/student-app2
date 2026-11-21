@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, internalHeaders, requireStaffOrServer } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { processEmailTemplate } from "@/lib/email-templates";
 
@@ -58,6 +59,9 @@ function normalizeOptionalRecipients(
 }
 
 export async function POST(request: NextRequest) {
+  const caller = await requireStaffOrServer(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { recipientEmail, templateId, cardId } = await request.json();
 
@@ -192,6 +196,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...internalHeaders(),
       },
       body: JSON.stringify(sendEmailPayload),
     });
@@ -250,6 +255,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   return NextResponse.json({
     message: "Send Email Template API Endpoint",
     method: "POST",

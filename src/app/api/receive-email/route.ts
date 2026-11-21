@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, requireN8nSecret } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 
@@ -9,6 +10,9 @@ import { id } from "@instantdb/admin";
  * This endpoint is called by n8n when a reply email is received
  */
 export async function POST(request: NextRequest) {
+  const denied = requireN8nSecret(request);
+  if (denied) return denied;
+
   try {
     const { from, to, cc, subject, body, cardId, emailId, inReplyTo } = await request.json();
 
@@ -124,6 +128,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for documentation
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   return NextResponse.json({
     message: "Receive Email API Endpoint",
     method: "POST",

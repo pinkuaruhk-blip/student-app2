@@ -5,6 +5,7 @@
  */
 
 import { adminDb } from "./db-admin";
+import { internalHeaders } from "@/lib/staff-auth";
 import { id as generateId } from "@instantdb/admin";
 import { processEmailTemplate, getFormLink } from "./email-templates";
 
@@ -564,7 +565,7 @@ async function executeSendFormLinkAction(
 
   const response = await fetch(`${baseUrl}/api/send-email`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...internalHeaders() },
     body: JSON.stringify({
       to: recipientEmail,
       from: fromEmail,
@@ -690,7 +691,7 @@ async function executeSendEmailAction(
 
   const response = await fetch(`${baseUrl}/api/send-email`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...internalHeaders() },
     body: JSON.stringify({
       to: recipientEmail,
       from: fromEmail,

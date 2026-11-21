@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly, internalHeaders, requireN8nSecret } from "@/lib/staff-auth";
 import { init, id } from "@instantdb/admin";
 
 // Initialize InstantDB Admin SDK
 // Force recompile - added fromName support to email templates
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || "f0827431-76de-4f51-a2c3-bae2e1558bcc";
 const ADMIN_KEY = process.env.INSTANT_ADMIN_KEY;
-const N8N_SECRET = process.env.N8N_SHARED_SECRET;
 
 if (!ADMIN_KEY) {
   console.error("INSTANT_ADMIN_KEY is not set");
@@ -54,6 +54,9 @@ async function loadFieldDefinitions(): Promise<Array<{ name: string; label: stri
  * Much simpler than Formbricks since you control the payload structure
  */
 export async function POST(request: NextRequest) {
+  const denied = requireN8nSecret(request);
+  if (denied) return denied;
+
   // Debug logs array to capture all logs for response
   const debugLogs: string[] = [];
   const log = (message: string) => {
@@ -90,15 +93,7 @@ export async function POST(request: NextRequest) {
       console.error("Failed to save log:", err);
     }
 
-    // Verify secret (optional)
-    const secret = request.nextUrl.searchParams.get("secret") || body.secret;
-    if (N8N_SECRET && secret && secret !== N8N_SECRET) {
-      console.warn("Secret mismatch:", { received: secret, expected: N8N_SECRET });
-      return NextResponse.json(
-        { error: "Invalid secret" },
-        { status: 401 }
-      );
-    }
+    // The n8n secret was already checked by requireN8nSecret above.
 
     if (!ADMIN_KEY) {
       return NextResponse.json(
@@ -526,7 +521,7 @@ export async function POST(request: NextRequest) {
 
                           const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: { "Content-Type": "application/json", ...internalHeaders() },
                             body: JSON.stringify({
                               to: recipientEmail,
                               from: template.fromEmail || undefined,
@@ -648,7 +643,7 @@ export async function POST(request: NextRequest) {
 
                           const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: { "Content-Type": "application/json", ...internalHeaders() },
                             body: JSON.stringify({
                               to: recipientEmail,
                               from: template?.fromEmail || undefined,
@@ -756,7 +751,7 @@ export async function POST(request: NextRequest) {
 
                 const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", ...internalHeaders() },
                   body: JSON.stringify({
                     to: recipientEmail,
                     from: template.fromEmail || undefined,
@@ -853,6 +848,9 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for testing
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   const pipeId = request.nextUrl.searchParams.get("pipeId");
   const stageId = request.nextUrl.searchParams.get("stageId");
 
