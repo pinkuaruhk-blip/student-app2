@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     console.log("🔍 Querying system_settings from admin DB...");
 
@@ -28,6 +32,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const { defaultFromEmail, defaultFromName } = await request.json();
 

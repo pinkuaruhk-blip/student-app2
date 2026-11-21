@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 
 /**
  * Debug endpoint to check card emails
  */
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const cardId = "d66d028a-2687-492f-89d0-ee9815abf278";
 

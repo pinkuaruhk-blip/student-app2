@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 import schema from "../../../../instant.schema";
 
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const appId = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
     const adminKey = process.env.INSTANT_ADMIN_KEY;

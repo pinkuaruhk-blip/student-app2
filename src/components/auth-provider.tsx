@@ -17,21 +17,33 @@ export function SignedIn({ children }: { children: React.ReactNode }) {
     if (!user?.email) return;
 
     setIsVerifying(true);
-    fetch("/api/auth/check-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user.email }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.allowed) {
-          db.auth.signOut();
+
+    // Fail closed: sign out unless the server confirms the email is allowed.
+    // One retry, so a single dropped request does not sign staff out.
+    const checkOnce = async (): Promise<boolean> => {
+      const res = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json().catch(() => null);
+      return res.ok && data?.allowed === true;
+    };
+
+    (async () => {
+      let allowed = false;
+      for (let attempt = 0; attempt < 2 && !allowed; attempt++) {
+        try {
+          allowed = await checkOnce();
+          if (!allowed) break; // the server answered "no": no point retrying
+        } catch {
+          // network error: retry once, then treat as not allowed
         }
-      })
-      .catch(() => {
-        // Fail open on network errors to avoid locking out users unintentionally
-      })
-      .finally(() => setIsVerifying(false));
+      }
+      if (!allowed) {
+        db.auth.signOut();
+      }
+    })().finally(() => setIsVerifying(false));
   }, [user?.email]);
 
   if (isLoading || isVerifying) {

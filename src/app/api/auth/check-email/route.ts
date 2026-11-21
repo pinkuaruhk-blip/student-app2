@@ -9,9 +9,13 @@ export async function POST(request: NextRequest) {
 
   const allowedEmails = process.env.ALLOWED_EMAILS;
 
-  // If no allowlist is configured, allow all emails (backwards-compatible default)
+  // No allowlist configured: deny everyone rather than let anyone in.
   if (!allowedEmails || allowedEmails.trim() === "") {
-    return NextResponse.json({ allowed: true });
+    console.error("[check-email] ALLOWED_EMAILS is not set; denying sign-in");
+    return NextResponse.json(
+      { allowed: false, error: "Sign-in is not configured on this server." },
+      { status: 503 }
+    );
   }
 
   const allowedList = allowedEmails.split(",").map((e) => e.trim().toLowerCase());

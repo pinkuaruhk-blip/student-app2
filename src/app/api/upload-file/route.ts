@@ -1,15 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import crypto from "crypto";
+import { loadPublicFormContext } from "@/lib/public-form";
 
+// Same limit the public form shows to the recipient.
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+// Public: used by the form page (/form/[cardId]/[formId]) for signed-out
+// recipients, so it only accepts uploads for an open client form on a real card.
 export async function POST(request: NextRequest) {
   try {
-    const { fileName, fileData, fileType } = await request.json();
+    const { cardId, formId, fileName, fileData, fileType } = await request.json();
 
-    if (!fileName || !fileData) {
+    if (!fileName || !fileData || typeof fileData !== "string") {
       return NextResponse.json(
         { error: "Missing fileName or fileData" },
         { status: 400 }
+      );
+    }
+
+    const ctx = await loadPublicFormContext(cardId, formId);
+    if (!ctx) {
+      return NextResponse.json({ error: "Form or card not found" }, { status: 404 });
+    }
+    if (ctx.existingSubmission) {
+      return NextResponse.json(
+        { error: "This form has already been submitted" },
+        { status: 409 }
       );
     }
 
@@ -35,6 +52,9 @@ export async function POST(request: NextRequest) {
 
     // Convert base64 to buffer
     const buffer = Buffer.from(base64Data, "base64");
+    if (buffer.length === 0 || buffer.length > MAX_FILE_BYTES) {
+      return NextResponse.json({ error: "File is empty or larger than 2MB" }, { status: 413 });
+    }
 
     console.log(`📤 Uploading ${fileName} (${(buffer.length / 1024).toFixed(2)} KB) to Vercel Blob...`);
 

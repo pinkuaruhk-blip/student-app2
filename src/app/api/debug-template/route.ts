@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
     const ADMIN_TOKEN = process.env.INSTANT_ADMIN_KEY;

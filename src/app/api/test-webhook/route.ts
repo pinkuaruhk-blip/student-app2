@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || "f0827431-76de-4f51-a2c3-bae2e1558bcc";
@@ -14,6 +15,9 @@ const db = init({
  * Visit: http://localhost:3000/api/test-webhook
  */
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     // Query all cards to see what's in the database
     const result = await db.query({

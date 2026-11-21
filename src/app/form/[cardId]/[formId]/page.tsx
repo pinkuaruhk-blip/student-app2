@@ -240,6 +240,8 @@ export default function PublicFormPage({ params }: PageProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            cardId,
+            formId,
             fileName: file.name,
             fileData: base64String,
             fileType: file.type,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 
@@ -6,6 +7,9 @@ import { id } from "@instantdb/admin";
  * Test endpoint to verify admin SDK and schema
  */
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     // Try to create a test card_email to see if schema is properly configured
     const testCardId = id();
