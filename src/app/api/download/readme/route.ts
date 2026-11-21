@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { readFileSync } from "fs";
 import { join } from "path";
 
 export async function GET() {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const readmePath = join(process.cwd(), "README.md");
     const content = readFileSync(readmePath, "utf-8");

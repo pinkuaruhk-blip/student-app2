@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 
@@ -7,7 +8,10 @@ import { id } from "@instantdb/admin";
  * POST - Save Kanban display settings to database
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     // Query system settings from database
     const systemSettings = await adminDb.query({
@@ -25,6 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { settings } = await request.json();
 

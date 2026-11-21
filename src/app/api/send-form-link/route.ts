@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { Resend } from "resend";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -50,6 +51,9 @@ function resolveEffectiveSender(
 }
 
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { cardId, formId, recipientEmail, formName, cardTitle, from, fromName } =
       await request.json();

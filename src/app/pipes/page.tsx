@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { db } from "@/lib/db";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -137,7 +138,7 @@ export default function PipesPage() {
     setIsDuplicating(true);
 
     try {
-      const response = await fetch("/api/duplicate-pipe", {
+      const response = await staffFetch("/api/duplicate-pipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipeId }),
@@ -186,7 +187,7 @@ export default function PipesPage() {
 
     setIsDeletingCards(true);
     try {
-      const response = await fetch("/api/delete-all-cards", {
+      const response = await staffFetch("/api/delete-all-cards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipeId: deleteCardsPipeId }),

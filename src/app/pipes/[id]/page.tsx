@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { CardModalNew } from "@/components/card-modal-new";
 import { StageFormBuilder } from "@/components/stage-form-builder";
 import { RichTextEditor, RichTextEditorRef } from "@/components/rich-text-editor";
@@ -218,7 +219,7 @@ export default function KanbanPage() {
     setIsDuplicating(true);
 
     try {
-      const response = await fetch("/api/duplicate-pipe", {
+      const response = await staffFetch("/api/duplicate-pipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipeId }),
@@ -246,7 +247,7 @@ export default function KanbanPage() {
 
   // Load field definitions (key -> label mapping)
   useEffect(() => {
-    fetch("/api/n8n-fields")
+    staffFetch("/api/n8n-fields")
       .then(res => res.json())
       .then(data => {
         if (data.fields) {
@@ -267,7 +268,7 @@ export default function KanbanPage() {
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     let cancelled = false;
 
-    fetch("/api/kanban-display", { signal: controller.signal })
+    staffFetch("/api/kanban-display", { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
         if (cancelled) return;
@@ -1085,7 +1086,7 @@ export default function KanbanPage() {
 
     // Optionally send event to API for n8n integration
     try {
-      await fetch("/api/events", {
+      await staffFetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 import twilio from "twilio";
@@ -13,6 +14,9 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
  * Sends SMS via Twilio and logs it to the database
  */
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   const debugLogs: string[] = [];
   const log = (message: string, ...args: any[]) => {
     console.log(message, ...args);

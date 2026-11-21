@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { init } from "@instantdb/admin";
 
-const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID!;
+const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || "f0827431-76de-4f51-a2c3-bae2e1558bcc";
 const ADMIN_KEY = process.env.INSTANT_ADMIN_KEY!;
 
 if (!APP_ID || !ADMIN_KEY) {
@@ -16,6 +17,9 @@ const db = init({
 const BATCH_SIZE = 200;
 
 export async function POST(req: NextRequest) {
+  const staff = await requireStaff(req);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { pipeId } = await req.json();
 

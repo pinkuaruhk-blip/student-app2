@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 
 /**
  * POST /api/events
@@ -17,6 +18,9 @@ import { NextRequest, NextResponse } from "next/server";
  * }
  */
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const body = await request.json();
     const { event, ...data } = body;

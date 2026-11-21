@@ -1,6 +1,7 @@
 "use client";
 
 import { db } from "@/lib/db";
+import { staffFetch } from "@/lib/staff-fetch";
 import { useState, useEffect, useRef } from "react";
 import { id } from "@instantdb/react";
 import { replacePlaceholders } from "@/lib/placeholders";
@@ -659,7 +660,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
     setSendingSms(true);
 
     try {
-      const response = await fetch("/api/send-sms", {
+      const response = await staffFetch("/api/send-sms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -737,7 +738,7 @@ export function CardModalNew({ card, onClose }: CardModalProps) {
     setSendingFormLink(true);
 
     try {
-      const response = await fetch("/api/send-form-link", {
+      const response = await staffFetch("/api/send-form-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

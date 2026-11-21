@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -20,7 +21,7 @@ export default function N8nFieldsPage() {
 
   // Load fields from server on mount
   useEffect(() => {
-    fetch("/api/n8n-fields")
+    staffFetch("/api/n8n-fields")
       .then(res => res.json())
       .then(data => {
         if (data.fields) {
@@ -33,7 +34,7 @@ export default function N8nFieldsPage() {
   const saveFields = async (newFields: FieldDefinition[]) => {
     setSaveStatus("saving");
     try {
-      const response = await fetch("/api/n8n-fields", {
+      const response = await staffFetch("/api/n8n-fields", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fields: newFields }),

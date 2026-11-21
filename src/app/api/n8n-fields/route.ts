@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { adminDb } from "@/lib/db-admin";
 import { id } from "@instantdb/admin";
 
@@ -7,7 +8,10 @@ import { id } from "@instantdb/admin";
  * POST - Save field definitions to database
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     // Query all field definitions from database
     const result = await adminDb.query({
@@ -34,6 +38,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { fields } = await request.json();
 

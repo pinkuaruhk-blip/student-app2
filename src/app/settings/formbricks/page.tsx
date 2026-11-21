@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -17,7 +18,7 @@ export default function FormbricksSettingsPage() {
 
   // Load mappings from server on mount
   useEffect(() => {
-    fetch("/api/formbricks-mappings")
+    staffFetch("/api/formbricks-mappings")
       .then(res => res.json())
       .then(data => {
         if (data.mappings) {
@@ -30,7 +31,7 @@ export default function FormbricksSettingsPage() {
   const saveMappings = async (newMappings: FieldMapping[]) => {
     setSaveStatus("saving");
     try {
-      const response = await fetch("/api/formbricks-mappings", {
+      const response = await staffFetch("/api/formbricks-mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mappings: newMappings }),

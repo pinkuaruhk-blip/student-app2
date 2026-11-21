@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 
@@ -10,7 +11,10 @@ const TEMPLATES_FILE = "/home/vibecode/workspace/data/email-templates.json";
  * DELETE - Delete email template
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     if (!existsSync(TEMPLATES_FILE)) {
       return NextResponse.json({ templates: [] });
@@ -27,6 +31,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { template } = await request.json();
 
@@ -74,6 +81,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const templateId = request.nextUrl.searchParams.get("id");
 

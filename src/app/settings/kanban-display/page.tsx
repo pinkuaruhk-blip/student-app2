@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -17,7 +18,7 @@ export default function KanbanDisplayPage() {
   // Load n8n field definitions and display settings
   useEffect(() => {
     // Load field definitions
-    fetch("/api/n8n-fields")
+    staffFetch("/api/n8n-fields")
       .then(res => res.json())
       .then(data => {
         if (data.fields) {
@@ -25,7 +26,7 @@ export default function KanbanDisplayPage() {
           setAvailableFields(fieldNames);
 
           // Load display settings
-          return fetch("/api/kanban-display");
+          return staffFetch("/api/kanban-display");
         }
       })
       .then(res => res?.json())
@@ -43,7 +44,7 @@ export default function KanbanDisplayPage() {
   const saveSettings = async (newSettings: FieldDisplay[]) => {
     setSaveStatus("saving");
     try {
-      const response = await fetch("/api/kanban-display", {
+      const response = await staffFetch("/api/kanban-display", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: newSettings }),

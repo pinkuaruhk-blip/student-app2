@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { staffFetch } from "@/lib/staff-fetch";
 import { db } from "@/lib/db";
 import { id } from "@instantdb/react";
 import { RichTextEditor } from "./rich-text-editor";
@@ -72,7 +73,7 @@ export function StageFormBuilder({ stageId, existingFormId, onClose }: StageForm
 
   // Load n8n field definitions
   useEffect(() => {
-    fetch("/api/n8n-fields")
+    staffFetch("/api/n8n-fields")
       .then(res => res.json())
       .then(data => {
         if (data.fields) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { db } from "@/lib/db";
+import { staffFetch } from "@/lib/staff-fetch";
 import { useState, useEffect } from "react";
 import { id } from "@instantdb/react";
 
@@ -54,7 +55,7 @@ export function CardModal({ card, onClose }: CardModalProps) {
 
   // Load email templates
   useEffect(() => {
-    fetch("/api/email-templates")
+    staffFetch("/api/email-templates")
       .then(res => res.json())
       .then(data => {
         if (data.templates) {
@@ -293,7 +294,7 @@ export function CardModal({ card, onClose }: CardModalProps) {
     setSendingFormLink(true);
 
     try {
-      const response = await fetch("/api/send-form-link", {
+      const response = await staffFetch("/api/send-form-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

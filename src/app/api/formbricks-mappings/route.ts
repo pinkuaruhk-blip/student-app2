@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaff } from "@/lib/staff-auth";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 
@@ -9,7 +10,10 @@ const MAPPINGS_FILE = "/home/vibecode/workspace/data/formbricks-field-mappings.j
  * POST - Save field mappings
  */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     if (!existsSync(MAPPINGS_FILE)) {
       return NextResponse.json({ mappings: [] });
@@ -26,6 +30,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const staff = await requireStaff(request);
+  if (staff instanceof NextResponse) return staff;
+
   try {
     const { mappings } = await request.json();
 

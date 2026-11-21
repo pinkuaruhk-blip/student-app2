@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, Login } from "@/components/auth-provider";
+import { staffFetch } from "@/lib/staff-fetch";
 import { db } from "@/lib/db";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -17,7 +18,7 @@ export default function AutomationsPage() {
 
   // Load n8n field definitions
   useEffect(() => {
-    fetch("/api/n8n-fields")
+    staffFetch("/api/n8n-fields")
       .then((res) => res.json())
       .then((data) => {
         if (data.fields) {

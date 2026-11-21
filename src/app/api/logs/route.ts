@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { devOnly } from "@/lib/staff-auth";
 import { readFile } from "fs/promises";
 
 /**
@@ -6,6 +7,9 @@ import { readFile } from "fs/promises";
  * Visit: http://localhost:3000/api/logs
  */
 export async function GET(request: NextRequest) {
+  const blocked = devOnly();
+  if (blocked) return blocked;
+
   try {
     const logPath = '/home/vibecode/workspace/logs/formbricks-webhook.json';
     const content = await readFile(logPath, 'utf-8');
