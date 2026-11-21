@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { db } from "@/lib/db";
-import { id } from "@instantdb/react";
-import { replacePlaceholders } from "@/lib/placeholders";
 import { useTranslations } from "next-intl";
+
+// The server fills in every placeholder except the dates, which are left for
+// the browser so they show in the recipient's own locale and time zone.
+function renderDates(text: string): string {
+  return text
+    .replace(/\{\{current_date\}\}/g, new Date().toLocaleDateString())
+    .replace(/\{\{current_datetime\}\}/g, new Date().toLocaleString());
+}
 
 interface FormField {
   id: string;
@@ -98,71 +103,41 @@ export default function PublicFormPage({ params }: PageProps) {
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
-  // Query the form, card, and check for existing submissions
-  const { data, isLoading } = db.useQuery({
-    stage_forms: {
-      $: { where: { id: formId } },
-    },
-    cards: {
-      $: { where: { id: cardId } },
-      fields: {},
-      stage: {
-        pipe: {},
-      },
-      form_submissions: {
-        form: {},
-      },
-    },
-    system_settings: {}, // Fetch global variables
-  });
-
+  // Load the form from the server. The browser has no Instant access here:
+  // the server checks the card/form pair and fills in content placeholders.
   useEffect(() => {
-    if (!isLoading && data) {
-      const form = data.stage_forms?.[0];
-      const card = data.cards?.[0];
+    let cancelled = false;
 
-      if (!form || !card) {
-        setError("Form or card not found");
-      } else {
-        // Check if this specific form was already submitted for this card
-        const existingSubmission = card.form_submissions?.find(
-          (sub: any) => sub.form?.id === formId
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/public-form/${encodeURIComponent(cardId)}/${encodeURIComponent(formId)}`,
+          { cache: "no-store" }
         );
+        const payload = await res.json().catch(() => null);
+        if (cancelled) return;
 
-        if (existingSubmission && !submitting) {
-          setSubmitted(true);
+        if (!res.ok || !payload?.form) {
+          setError(payload?.error || "Form or card not found");
+          return;
         }
 
-        setFormData({ form, card });
-
-        // Pre-fill form fields based on prefillFromField configuration
-        if (form.fields && card.form_submissions) {
-          const prefillValues: Record<string, any> = {};
-
-          for (const field of form.fields) {
-            if (field.prefillFromField) {
-              const { formId, fieldName } = field.prefillFromField;
-
-              // Find the most recent submission of the source form
-              const sourceSubmission = card.form_submissions.find(
-                (sub: any) => sub.form?.id === formId
-              );
-
-              if (sourceSubmission && sourceSubmission.responses && sourceSubmission.responses[fieldName]) {
-                prefillValues[field.name] = sourceSubmission.responses[fieldName];
-              }
-            }
-          }
-
-          // Set pre-filled values to responses state
-          if (Object.keys(prefillValues).length > 0) {
-            setResponses(prefillValues);
-          }
+        setFormData(payload);
+        if (payload.alreadySubmitted) setSubmitted(true);
+        if (payload.prefill && Object.keys(payload.prefill).length > 0) {
+          setResponses(payload.prefill);
         }
+      } catch {
+        if (!cancelled) setError("Form or card not found");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    }
-  }, [data, isLoading, formId, submitting]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId, formId]);
 
   const handleInputChange = (fieldName: string, value: any) => {
     setResponses({
@@ -346,13 +321,8 @@ export default function PublicFormPage({ params }: PageProps) {
       return;
     }
 
-    // Double-check if form was already submitted (prevent race conditions)
-    const card = data?.cards?.[0];
-    const existingSubmission = card?.form_submissions?.find(
-      (sub: any) => sub.form?.id === formId
-    );
-
-    if (existingSubmission) {
+    // The server rejects a second submission too; this only saves a round trip.
+    if (formData?.alreadySubmitted) {
       alert("This form has already been submitted and cannot be resubmitted.");
       setSubmitted(true);
       return;
@@ -390,29 +360,27 @@ export default function PublicFormPage({ params }: PageProps) {
     setSubmitting(true);
 
     try {
-      const submissionId = id();
-      console.log("Submission ID:", submissionId);
-      console.log("Attempting database transaction...");
-      console.log("Transaction data:", {
-        responses,
-        submittedAt: Date.now(),
-        submitterEmail: submitterEmail || undefined,
-        cardId: cardId,
-        formId: formId,
-      });
+      const saveResponse = await fetch(
+        `/api/public-form/${encodeURIComponent(cardId)}/${encodeURIComponent(formId)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ responses, submitterEmail: submitterEmail || undefined }),
+        }
+      );
+      const saveResult = await saveResponse.json().catch(() => null);
 
-      const result = await db.transact([
-        db.tx.form_submissions[submissionId]
-          .update({
-            responses,
-            submittedAt: Date.now(),
-            submitterEmail: submitterEmail || undefined,
-          })
-          .link({ card: cardId, form: formId }),
-      ]);
+      if (saveResponse.status === 409) {
+        alert("This form has already been submitted and cannot be resubmitted.");
+        setSubmitted(true);
+        return;
+      }
+      if (!saveResponse.ok || !saveResult?.submissionId) {
+        throw new Error(saveResult?.error || `Server returned ${saveResponse.status}`);
+      }
 
-      console.log("✅ Transaction result:", result);
-      console.log("✅ Transaction completed successfully");
+      const submissionId: string = saveResult.submissionId;
+      console.log("✅ Submission saved:", submissionId);
 
       try {
         console.log("Triggering server-side form submission automations", {
@@ -534,7 +502,7 @@ export default function PublicFormPage({ params }: PageProps) {
             <p>{tForms('formAlreadySubmittedMessage')}</p>
           </div>
           <p className="text-sm text-gray-500">
-            {tForms('card')}: <span className="font-medium">{formData?.card?.title}</span>
+            {tForms('card')}: <span className="font-medium">{formData?.cardTitle}</span>
           </p>
           <p className="text-xs text-gray-400 mt-4">
             {tForms('contactAdministrator')}
@@ -554,7 +522,7 @@ export default function PublicFormPage({ params }: PageProps) {
           <div className="bg-blue-600 text-white px-6 py-8">
             <h1 className="text-3xl font-bold mb-2">{formData.form.name}</h1>
             <p className="text-blue-100">
-              {tForms('for')}: <span className="font-medium">{formData.card.title}</span>
+              {tForms('for')}: <span className="font-medium">{formData.cardTitle}</span>
             </p>
           </div>
 
@@ -578,24 +546,7 @@ export default function PublicFormPage({ params }: PageProps) {
                 )}
                 {field.type === "content" && (
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    {replacePlaceholders(field.label, {
-                      card: {
-                        title: formData.card.title,
-                        description: formData.card.description,
-                        fields: formData.card.fields || [],
-                      },
-                      stage: {
-                        name: formData.card.stage?.name,
-                      },
-                      pipe: {
-                        name: formData.card.stage?.pipe?.name,
-                      },
-                      form: {
-                        name: formData.form.name,
-                      },
-                      formSubmissions: formData.card.form_submissions || [],
-                      globalVariables: data?.system_settings?.[0]?.globalVariables || [],
-                    })}
+                    {renderDates(field.label || "")}
                   </h3>
                 )}
 
@@ -778,24 +729,7 @@ export default function PublicFormPage({ params }: PageProps) {
                   <div
                     className="prose prose-sm max-w-none bg-blue-50 border border-blue-200 rounded-lg p-4 [&_*]:!text-gray-900"
                     dangerouslySetInnerHTML={{
-                      __html: replacePlaceholders(field.content || "", {
-                        card: {
-                          title: formData.card.title,
-                          description: formData.card.description,
-                          fields: formData.card.fields || [],
-                        },
-                        stage: {
-                          name: formData.card.stage?.name,
-                        },
-                        pipe: {
-                          name: formData.card.stage?.pipe?.name,
-                        },
-                        form: {
-                          name: formData.form.name,
-                        },
-                        formSubmissions: formData.card.form_submissions || [],
-                        globalVariables: data?.system_settings?.[0]?.globalVariables || [],
-                      }),
+                      __html: renderDates(field.content || ""),
                     }}
                   />
                 )}
