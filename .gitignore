@@ -7,3 +7,5 @@
 .dotclaude/
 STACK.md
 node_modules/
+/.next/
+*.tsbuildinfo
