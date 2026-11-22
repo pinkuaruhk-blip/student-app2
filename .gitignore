@@ -9,3 +9,4 @@ STACK.md
 node_modules/
 /.next/
 *.tsbuildinfo
+/logs/
