@@ -1,300 +1,218 @@
-# FlowLane: Kanban Board with InstantDB
+# FlowLane
 
-A lightweight workflow app built with Next.js, InstantDB, Resend, and n8n automations. Features real-time collaboration, custom fields, form integration, and email automation.
+FlowLane is a private, staff-only Kanban app for student-offer application pipelines.
 
-## Features
+Staff manage **pipes** (pipelines), **stages** (columns) and **cards** (applications). Each card has custom fields, comments, email and SMS threads, client forms and a stage history. n8n creates and moves cards. Automations send email (Resend) and SMS (Twilio). Clients fill in forms through a public link, `/form/[cardId]/[formId]`, without signing in. Uploads are stored in Vercel Blob. The UI is translated with next-intl (English, Simplified Chinese, Traditional Chinese).
 
-- ✅ **Kanban Board**: Drag-and-drop cards between stages with real-time updates
-- ✅ **Multiple Pipes**: Create and manage multiple workflows
-- ✅ **Custom Fields**: Add custom fields to cards (text, number, date, select, file)
-- ✅ **Magic Link Auth**: Passwordless authentication via email
-- ✅ **Form Integration**: Formbricks webhook integration to create cards from forms
-- ✅ **Email Automation**: Resend-powered outbound email with optional n8n inbound/reply workflows
-- ✅ **Real-time Sync**: InstantDB provides instant updates across all clients
-- ✅ **Owner-only Access**: Secure permissions with single-user setup
+Production: https://flowlane.klobsterltd.com (Vercel).
 
-## Tech Stack
+## Tech stack
 
-- **Frontend**: Next.js 15 + React 19 + Tailwind CSS
-- **Database**: InstantDB (reactive, real-time database)
-- **Auth**: InstantDB magic-code email authentication
-- **Drag & Drop**: @dnd-kit/core
-- **Forms**: Formbricks (external, webhook-based)
-- **Automations**: n8n (self-hosted or cloud)
+- Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS 4
+- InstantDB 0.22: `@instantdb/react` in the browser, `@instantdb/admin` in API routes
+- Resend (email), Twilio (SMS), Vercel Blob (file uploads)
+- next-intl (translations in `messages/en.json`, `zh-CN.json`, `zh-TW.json`; the locale comes from the `NEXT_LOCALE` cookie, default `en`)
+- @dnd-kit (drag and drop), Tiptap (rich-text editor)
+- n8n (external) for card intake, card moves and inbound email
 
-## Prerequisites
+Package manager: npm (`package-lock.json`). Node.js 20.9 or later (required by Next.js 16).
 
-- Node.js 20+ and npm
-- InstantDB account (free tier available)
-- n8n instance (optional, for automations and inbound email processing)
-- Formbricks account (optional, for form integration)
-
-## Quick Start
-
-### 1. Clone and Install
+## Commands
 
 ```bash
-npm install
+npm ci                                  # install dependencies
+npm run dev                             # dev server on http://localhost:3000
+npx tsc --noEmit --incremental false    # typecheck
+npm run lint                            # ESLint
+npm run build                           # production build
 ```
 
-### 2. Set up InstantDB
+There is no test suite.
 
-1. Go to [instantdb.com](https://instantdb.com) and create an account
-2. The app is already configured with App ID: `f0827431-76de-4f51-a2c3-bae2e1558bcc`
-3. Get your Admin API key from the InstantDB dashboard
+Note: a local `npm run dev` uses whatever InstantDB app `.env.local` points at. With the production app id, local runs read and write production data.
 
-### 3. Push the Schema
+## Access model
 
-Install the InstantDB CLI and push the schema:
+**Sign-in.** Staff sign in with an InstantDB magic code: they enter their email and type the 6-digit code that Instant emails them (`src/components/auth-provider.tsx`). Before a code is sent, the app calls `/api/auth/check-email`, which only allows addresses in the comma-separated `ALLOWED_EMAILS` variable. If `ALLOWED_EMAILS` is not set, it denies everyone with a 503. A signed-in user whose email is not allowed is signed out.
 
-```bash
-npm install -g @instantdb/cli
-npx instant-cli push schema --file instant.schema.ts
-```
+**Browser data access.** `instant.perms.ts` makes every entity staff-only: reads and writes need a signed-in user whose email is in the `STAFF_EMAILS` list in that file. Everything not listed is denied (`$default: false`), and browsers cannot create new attributes. These rules only take effect after they are pushed (see below).
 
-### 4. Configure Permissions
+**Adding or removing a staff member** means changing both:
 
-Push the permissions rules:
+1. `ALLOWED_EMAILS` in the Vercel environment variables (then redeploy), and
+2. `STAFF_EMAILS` in `instant.perms.ts`, then `npx instant-cli push perms --app <app id>`.
 
-```bash
-npx instant-cli push perms --file instant.perms.ts
-```
+**API routes.** Routes use the Instant admin key, which bypasses the permission rules, so each route checks its caller with a guard from `src/lib/staff-auth.ts`:
 
-### 5. Environment Variables
+| Guard | Who passes |
+|---|---|
+| `requireStaff` | A signed-in staff user. The browser sends its Instant refresh token as `Authorization: Bearer <token>` (use `staffFetch` from `src/lib/staff-fetch.ts`); the route verifies it with Instant and checks the email against `ALLOWED_EMAILS`. 503 if `ALLOWED_EMAILS` is unset. |
+| `requireStaffOrServer` | Staff as above, or this server's own calls (header `x-flowlane-internal`, a key derived from `INSTANT_ADMIN_KEY`), or n8n (the n8n secret). |
+| `requireN8nSecret` | Requests whose `X-FlowLane-Secret` header equals `N8N_SHARED_SECRET`. 503 if the variable is unset, 401 if the header is wrong. |
+| `devOnly` | Local development only; returns 404 when `NODE_ENV` is `production`. |
 
-Create a `.env.local` file in the project root:
+Public by design (no guard): `auth/check-email`, `public-form/[cardId]/[formId]`, `upload-file`, `form-submission-automations/execute` and `resend/webhook`. These validate their input instead:
+
+- `public-form` and `upload-file` only work for an existing card and client form that has not been submitted yet. Uploads are limited to 2 MB.
+- `form-submission-automations/execute` only runs for a submission that exists and is less than 15 minutes old.
+- `resend/webhook` verifies the Svix signature headers with `RESEND_WEBHOOK_SECRET`.
+
+### API routes
+
+All routes are under `src/app/api`. "GET (dev)" is a `devOnly` info endpoint.
+
+| Route | Methods | Guard |
+|---|---|---|
+| `auth/check-email` | POST | public |
+| `cards/move` | POST, GET (dev) | n8n secret |
+| `cleanup` | GET | dev only |
+| `debug-emails` | GET | dev only |
+| `debug-settings` | GET, POST | dev only |
+| `debug-template` | GET | dev only |
+| `delete-all-cards` | POST | staff |
+| `download/readme` | GET | dev only |
+| `duplicate-pipe` | POST | staff |
+| `email-templates` | GET, POST, DELETE | staff |
+| `events` | POST | staff (forwards UI events to `N8N_EVENTS_URL`) |
+| `execute-automations` | POST | staff or server |
+| `form-submission-automations/execute` | POST | public (validated) |
+| `formbricks-mappings` | GET, POST | staff (Formbricks-era leftover) |
+| `intake/formbricks` | POST, GET | dev only (Formbricks-era leftover) |
+| `intake/n8n` | POST, GET (dev) | n8n secret |
+| `kanban-display` | GET, POST | staff |
+| `logs` | GET | dev only |
+| `n8n-fields` | GET, POST | staff |
+| `public-form/[cardId]/[formId]` | GET, POST | public (validated) |
+| `receive-email` | POST, GET (dev) | n8n secret |
+| `resend/webhook` | POST, GET | public; POST is signature-verified, GET only reports whether the secret is set and the supported events |
+| `send-email` | POST, GET (dev) | staff or server |
+| `send-email-template` | POST, GET (dev) | staff or server |
+| `send-form-link` | POST | staff |
+| `send-sms` | POST | staff |
+| `test-admin-db` | GET | dev only |
+| `test-schema` | GET | dev only |
+| `test-webhook` | GET | dev only |
+| `upload-file` | POST | public (validated) |
+
+## n8n
+
+n8n calls these routes, always with the header `X-FlowLane-Secret: <N8N_SHARED_SECRET>`:
+
+- `POST /api/intake/n8n`: create a card. `pipeId` and `stageId` come from the query string or the body; the title, description and fields come from the body (flat, nested under `data`, or a `fields` array).
+- `POST /api/cards/move`: move a card. Body: `{ "cardId": "...", "stageId": "..." }`.
+- `POST /api/receive-email`: log an inbound email on a card. The body needs `from`, `subject` and `body`; the card is taken from `cardId` or a `[#<card id>]` tag in the subject.
+
+If `N8N_EVENTS_URL` is set, the app also posts `card.created`, `card.moved` and UI events (via `/api/events`) to that n8n webhook.
+
+The `n8n-workflows/` folder holds three older workflow exports. They are not the live workflows, and the two that call the API do not send `X-FlowLane-Secret`:
+
+- `formbricks_intake.json`: Formbricks-era; posts to `/api/intake/formbricks`, which is now dev-only. Outdated.
+- `email_inbox.json`: Gmail trigger that posts comments to `/api/comments`, a route that does not exist. Outdated.
+- `events_bus.json`: a webhook that receives the events above and routes them to Gmail, Slack or Google Sheets.
+
+Formbricks is no longer used. The `intake/formbricks` route and the `settings/formbricks` page are leftovers.
+
+## Environment variables
+
+Set these in `.env.local` for local runs and in the Vercel dashboard for production. Values below are placeholders.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_INSTANT_APP_ID` | yes | InstantDB app id. Most code falls back to the production id `f0827431-76de-4f51-a2c3-bae2e1558bcc` if unset. |
+| `INSTANT_ADMIN_KEY` | yes | InstantDB admin key for API routes; also the source of the internal server key. |
+| `ALLOWED_EMAILS` | yes | Comma-separated staff emails allowed to sign in and call staff routes. Unset means nobody gets in. |
+| `N8N_SHARED_SECRET` | yes, for n8n | Value n8n must send in `X-FlowLane-Secret`. Unset means n8n routes return 503. |
+| `RESEND_API_KEY` | yes, for email | Resend API key for outbound email. |
+| `RESEND_WEBHOOK_SECRET` | yes, for delivery status | Verifies Resend webhook calls (delivery and bounce status). |
+| `DEFAULT_FROM_EMAIL` | yes, for email, unless set in system settings | Default sender address. A value saved in the app's system settings takes precedence. |
+| `DEFAULT_FROM_NAME` | no | Default sender name (system settings take precedence). |
+| `TWILIO_ACCOUNT_SID` | yes, for SMS | Twilio account SID. |
+| `TWILIO_AUTH_TOKEN` | yes, for SMS | Twilio auth token. |
+| `TWILIO_PHONE_NUMBER` | yes, for SMS | Twilio sender number. |
+| `BLOB_READ_WRITE_TOKEN` | yes, for uploads | Vercel Blob token for client form uploads. |
+| `NEXT_PUBLIC_APP_URL` | recommended | Public base URL used in links in emails and automations (falls back to `http://localhost:3000` or the request origin). |
+| `NEXT_PUBLIC_BASE_URL` | no | Fallback base URL for `send-form-link` when the request has no host header. |
+| `N8N_EVENTS_URL` | no | n8n webhook that receives card and UI events. |
+| `FORMBRICKS_SHARED_SECRET`, `FORMBRICKS_API_HOST`, `FORMBRICKS_API_KEY` | no | Read only by the dev-only `intake/formbricks` leftover. Not used in production. |
 
 ```env
-# InstantDB
 NEXT_PUBLIC_INSTANT_APP_ID=f0827431-76de-4f51-a2c3-bae2e1558bcc
-INSTANT_ADMIN_KEY=your-admin-key-here
-
-# Owner email (for permissions)
-OWNER_EMAIL=your-email@example.com
-
-# n8n (optional)
-N8N_EVENTS_URL=https://your-n8n-instance.com/webhook/events
-
-# Formbricks (optional)
-FORMBRICKS_SHARED_SECRET=your-shared-secret
+INSTANT_ADMIN_KEY=<instant admin key>
+ALLOWED_EMAILS=<staff1@example.com>,<staff2@example.com>
+N8N_SHARED_SECRET=<long random string>
+RESEND_API_KEY=<resend api key>
+RESEND_WEBHOOK_SECRET=<resend webhook signing secret>
+DEFAULT_FROM_EMAIL=<sender@your-domain>
+TWILIO_ACCOUNT_SID=<sid>
+TWILIO_AUTH_TOKEN=<token>
+TWILIO_PHONE_NUMBER=<+15550000000>
+BLOB_READ_WRITE_TOKEN=<vercel blob token>
+NEXT_PUBLIC_APP_URL=https://flowlane.klobsterltd.com
 ```
 
-### 6. Run the Development Server
+Never commit `.env` or `.env.local`.
+
+## InstantDB schema and permissions
+
+The data model is in `instant.schema.ts` (16 entities):
+
+| Entity | Holds |
+|---|---|
+| `pipes` | Pipelines |
+| `stages` | Columns of a pipe (ordered by `position`, optional colour) |
+| `cards` | Applications on the board |
+| `card_fields` | Custom field values on a card |
+| `card_comments` | Comments on a card |
+| `card_emails` | Sent and received emails for a card, with Resend delivery status |
+| `card_sms` | Sent and received SMS for a card |
+| `stage_forms` | Form templates attached to a stage (client or admin forms) |
+| `form_submissions` | Client form responses |
+| `card_history` | Stage moves of a card |
+| `automations` | Automation rules per pipe and stage (trigger, conditions, actions) |
+| `automation_logs` | Automation run history |
+| `email_templates` | Reusable email templates per pipe |
+| `sms_templates` | Reusable SMS templates per pipe |
+| `system_settings` | Default sender, global template variables, Kanban display settings |
+| `field_definitions` | Field definitions for n8n intake |
+
+Permissions are in `instant.perms.ts` (see Access model). Changes to either file only reach the database when pushed:
 
 ```bash
-npm run dev
+npx instant-cli push schema --app f0827431-76de-4f51-a2c3-bae2e1558bcc
+npx instant-cli push perms --app f0827431-76de-4f51-a2c3-bae2e1558bcc
 ```
-
-Visit [http://localhost:3000](http://localhost:3000) and sign in with your email.
-
-## Project Structure
-
-```
-flowlane/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx              # Home page with auth redirect
-│   │   ├── pipes/
-│   │   │   ├── page.tsx          # Pipes list page
-│   │   │   └── [id]/page.tsx    # Kanban board
-│   │   ├── settings/
-│   │   │   └── page.tsx          # Stage management
-│   │   └── api/
-│   │       ├── intake/formbricks/route.ts  # Formbricks webhook
-│   │       └── events/route.ts             # Events forwarding to n8n
-│   ├── components/
-│   │   └── auth-provider.tsx    # Auth components
-│   └── lib/
-│       └── db.ts                 # InstantDB client
-├── instant.schema.ts             # InstantDB schema definition
-├── instant.perms.ts              # Permissions rules
-├── n8n-workflows/                # n8n workflow templates
-│   ├── formbricks_intake.json
-│   ├── email_inbox.json
-│   └── events_bus.json
-└── README.md
-```
-
-## InstantDB Schema
-
-The schema defines 5 entities:
-
-- **pipes**: Workflow pipelines
-- **stages**: Columns within a pipe (with position for ordering)
-- **cards**: Items in the workflow
-- **card_fields**: Custom fields attached to cards
-- **card_comments**: Comments on cards (for email integration)
-
-Relationships are defined with links (one-to-many):
-- Pipe → Stages
-- Pipe → Cards
-- Stage → Cards
-- Card → Fields
-- Card → Comments
-
-## Authentication
-
-The app uses InstantDB's magic-code authentication:
-
-1. User enters email on login page
-2. InstantDB sends a magic link via email
-3. Clicking the link authenticates the user
-4. Permissions restrict writes to the owner email only
-
-## API Routes
-
-### POST /api/intake/formbricks
-
-Receives Formbricks form submissions and creates cards.
-
-**Headers:**
-- `X-FORMBRICKS-SECRET`: Shared secret for authentication
-
-**Body:**
-```json
-{
-  "pipeId": "pipe-id",
-  "stageId": "stage-id",
-  "title": "Card Title",
-  "description": "Optional description",
-  "fields": [
-    { "key": "email", "type": "text", "value": "user@example.com" },
-    { "key": "priority", "type": "select", "value": "high" }
-  ]
-}
-```
-
-### POST /api/events
-
-Receives events from the frontend and forwards them to n8n.
-
-**Body:**
-```json
-{
-  "event": "card.moved",
-  "cardId": "card-id",
-  "pipeId": "pipe-id",
-  "newStageId": "stage-id"
-}
-```
-
-## n8n Workflows
-
-### 1. Formbricks Intake (`formbricks_intake.json`)
-
-- Receives Formbricks webhook
-- Maps form data to card structure
-- Calls `/api/intake/formbricks`
-- Optionally sends confirmation email
-
-**Setup:**
-1. Import workflow to n8n
-2. Configure webhook URL in Formbricks
-3. Set environment variables: `NEXT_API_URL`, `FORMBRICKS_SHARED_SECRET`
-
-### 2. Email Inbox Monitor (`email_inbox.json`)
-
-- Polls Gmail inbox for new emails
-- Extracts card ID from subject line `[CARD:xxx]`
-- Creates comment on the card
-- Handles email attachments
-
-**Setup:**
-1. Import workflow to n8n
-2. Configure Gmail credentials
-3. Adjust email filters as needed
-4. Set up comment API endpoint (optional feature)
-
-### 3. Events Bus (`events_bus.json`)
-
-- Receives events from `/api/events`
-- Routes events by type
-- Optionally sends to Slack, Gmail, or Google Sheets
-
-**Setup:**
-1. Import workflow to n8n
-2. Configure the webhook URL in `.env.local` (`N8N_EVENTS_URL`)
-3. Enable desired notification channels
-
-## Formbricks Integration
-
-1. Create a form in Formbricks with conditional logic and file upload
-2. Add these hidden fields to capture pipe/stage info:
-   - `pipeId`
-   - `stageId`
-3. Configure webhook in Formbricks settings:
-   - URL: `https://your-domain.com/api/intake/formbricks`
-   - Header: `X-FORMBRICKS-SECRET: your-shared-secret`
 
 ## Deployment
 
-### Deploy to Vercel
+FlowLane runs on Vercel; production is https://flowlane.klobsterltd.com. Pushes to `main` deploy. Environment variables are set in the Vercel dashboard; changing them needs a redeploy to take effect.
 
-```bash
-npm run build
-vercel deploy
+## Project structure
+
 ```
-
-Make sure to set all environment variables in Vercel dashboard.
-
-### Important Notes
-
-- InstantDB free tier: 1 GB storage, unlimited API requests
-- Port 3000 is forwarded to the web in Vibecode sandbox
-- Schema changes require running `instant-cli push schema`
-- Permissions changes require running `instant-cli push perms`
-
-## Development
-
-### Adding a New Field Type
-
-1. Update the `card_fields` entity schema if needed
-2. Add rendering logic in the card drawer modal
-3. Update the Formbricks intake mapping
-
-### Adding a New Event Type
-
-1. Emit the event in the UI (call `/api/events`)
-2. Update the Events Bus workflow to handle it
-3. Add notification logic (Slack, email, etc.)
-
-## Troubleshooting
-
-### InstantDB Connection Issues
-
-- Verify `NEXT_PUBLIC_INSTANT_APP_ID` is set correctly
-- Check that schema has been pushed: `instant-cli push schema`
-- Ensure permissions are configured: `instant-cli push perms`
-
-### Authentication Not Working
-
-- Check that you're using the correct owner email in `.env.local`
-- Verify `OWNER_EMAIL` matches your login email
-- Check InstantDB dashboard for auth logs
-
-### Formbricks Webhook Failing
-
-- Verify `X-FORMBRICKS-SECRET` header matches `.env.local`
-- Check `INSTANT_ADMIN_KEY` is set in `.env.local`
-- Review API route logs for errors
-
-### n8n Workflows Not Triggering
-
-- Verify `N8N_EVENTS_URL` is set correctly
-- Check n8n webhook is active and accessible
-- Review n8n execution logs
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT
+src/
+  app/                  pages (App Router)
+    pipes/              pipe list and Kanban board (pipes/[id])
+    automations/        automation rules per pipe
+    email-templates/    email templates per pipe
+    sms-templates/      SMS templates per pipe
+    settings/           settings (forms, Kanban display, n8n fields, IDs)
+    form/               public client form (form/[cardId]/[formId])
+    admin/, debug/      admin and debug pages
+    api/                API routes (see the table above)
+  components/           auth provider, card modal, form builder, rich-text editor
+  contexts/             toast context
+  i18n/                 next-intl request config
+  lib/                  Instant clients, staff-auth, staff-fetch, automation engine, email and placeholder helpers
+messages/               translations (en, zh-CN, zh-TW)
+instant.schema.ts       InstantDB data model
+instant.perms.ts        InstantDB browser permissions
+n8n-workflows/          older n8n workflow exports (see n8n)
+```
 
 ## Resources
 
-- [InstantDB Documentation](https://instantdb.com/docs)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [n8n Documentation](https://docs.n8n.io)
-- [Formbricks Documentation](https://formbricks.com/docs)
+- [InstantDB docs](https://instantdb.com/docs)
+- [Next.js docs](https://nextjs.org/docs)
+- [n8n docs](https://docs.n8n.io)
+- [Resend docs](https://resend.com/docs)
+- [Twilio docs](https://www.twilio.com/docs)
