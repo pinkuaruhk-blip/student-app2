@@ -54,6 +54,33 @@ const INBOX_EMAIL_LIST_FIELDS = [
   "sentVia",
 ];
 
+// Delays before each automatic retry of the board query after an Instant
+// error such as operation-timed-out. Instant never resends a query that
+// errored, so a retry passes null for one render and then the same query.
+const BOARD_RETRY_DELAYS_MS = [1000, 3000, 6000];
+
+type BoardLoadAttempt = {
+  pipeId: string;
+  attempt: number;
+  startedAt: number;
+  // Whether this pipe's board was already on screen, in which case Instant
+  // hands back its cached result immediately on (re)subscribe.
+  hadCachedBoard: boolean;
+  firstData: unknown;
+  logged: boolean;
+};
+
+function logBoardLoadAttempt(a: BoardLoadAttempt, outcome: string, errorMessage?: string) {
+  a.logged = true;
+  console.info("[board-load]", {
+    pipeId: a.pipeId,
+    attempt: a.attempt,
+    outcome,
+    ms: Math.round(performance.now() - a.startedAt),
+    ...(errorMessage ? { error: errorMessage } : {}),
+  });
+}
+
 export default function KanbanPage() {
   const t = useTranslations('pipes');
   const tCommon = useTranslations('common');
@@ -342,8 +369,112 @@ export default function KanbanPage() {
       })()
     : null;
 
+  // Board retry state: boardSuspended swaps the query for null for one render,
+  // which makes Instant send a fresh add-query when boardQuery comes back.
+  const [boardSuspended, setBoardSuspended] = useState(false);
+  const [boardRetryCount, setBoardRetryCount] = useState(0);
+  const boardRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boardRetriedErrorRef = useRef<unknown>(null);
+  const lastGoodBoardRef = useRef<{ pipeId: string; data: any } | null>(null);
+  const boardAttemptRef = useRef<BoardLoadAttempt | null>(null);
+  const boardAttemptNumberRef = useRef(0);
+  const activeBoardQuery = boardSuspended ? null : boardQuery;
+
   // Query pipe with stages, cards, unread received emails, and only visible fields
-  const { isLoading, error, data } = db.useQuery(boardQuery as any) as { isLoading: boolean; error: any; data: any };
+  const { error, data } = db.useQuery(activeBoardQuery as any) as { isLoading: boolean; error: any; data: any };
+
+  // Remember the last good board for this pipe only. The hook can briefly
+  // return the previous pipe's data right after pipeId changes, so check the id.
+  if (data && !error && data.pipes?.[0]?.id === pipeId) {
+    lastGoodBoardRef.current = { pipeId, data };
+  }
+  const lastGoodBoard = lastGoodBoardRef.current?.pipeId === pipeId ? lastGoodBoardRef.current.data : null;
+  const boardData = data ?? lastGoodBoard;
+  const boardRetriesExhausted = !!error && boardRetryCount >= BOARD_RETRY_DELAYS_MS.length;
+  const boardIsStale = data == null && lastGoodBoard != null;
+
+  // New pipe: reset the retry budget; clear any pending retry on pipe change and unmount.
+  useEffect(() => {
+    boardAttemptNumberRef.current = 0;
+    setBoardRetryCount(0);
+    setBoardSuspended(false);
+    return () => {
+      if (boardRetryTimerRef.current) {
+        clearTimeout(boardRetryTimerRef.current);
+        boardRetryTimerRef.current = null;
+      }
+    };
+  }, [pipeId]);
+
+  // Schedule one automatic retry per new error, at most BOARD_RETRY_DELAYS_MS.length in a row.
+  useEffect(() => {
+    if (!error || boardSuspended || boardRetryTimerRef.current) return;
+    if (error === boardRetriedErrorRef.current) return;
+    if (boardRetryCount >= BOARD_RETRY_DELAYS_MS.length) return;
+    boardRetriedErrorRef.current = error;
+    boardRetryTimerRef.current = setTimeout(() => {
+      boardRetryTimerRef.current = null;
+      setBoardRetryCount((n) => n + 1);
+      setBoardSuspended(true);
+    }, BOARD_RETRY_DELAYS_MS[boardRetryCount]);
+  }, [error, boardSuspended, boardRetryCount]);
+
+  // The null query has been committed, so subscribe to boardQuery again.
+  useEffect(() => {
+    if (boardSuspended) setBoardSuspended(false);
+  }, [boardSuspended]);
+
+  const retryBoardLoad = () => {
+    if (boardRetryTimerRef.current) {
+      clearTimeout(boardRetryTimerRef.current);
+      boardRetryTimerRef.current = null;
+    }
+    setBoardRetryCount(0);
+    setBoardSuspended(true);
+  };
+
+  // Each subscribe of the board query is one load attempt, logged once.
+  const boardQueryKey = activeBoardQuery ? JSON.stringify(activeBoardQuery) : null;
+  useEffect(() => {
+    if (!boardQueryKey) return;
+    boardAttemptNumberRef.current += 1;
+    const attempt: BoardLoadAttempt = {
+      pipeId,
+      attempt: boardAttemptNumberRef.current,
+      startedAt: performance.now(),
+      hadCachedBoard: lastGoodBoardRef.current?.pipeId === pipeId,
+      firstData: undefined,
+      logged: false,
+    };
+    boardAttemptRef.current = attempt;
+    return () => {
+      if (!attempt.logged) {
+        logBoardLoadAttempt(attempt, attempt.firstData !== undefined ? "cached" : "no-reply");
+      }
+      if (boardAttemptRef.current === attempt) boardAttemptRef.current = null;
+    };
+  }, [boardQueryKey, pipeId]);
+
+  // Outcome of the current attempt: the first error, or the first data that
+  // did not come from Instant's cache. Fresh data also resets the retry budget.
+  useEffect(() => {
+    const attempt = boardAttemptRef.current;
+    if (!attempt || attempt.logged) return;
+    if (error) {
+      logBoardLoadAttempt(attempt, "error", typeof error?.message === "string" ? error.message : "unknown");
+      return;
+    }
+    if (data == null) return;
+    if (attempt.firstData === undefined) {
+      attempt.firstData = data;
+      // With a board already on screen, the first result is Instant's cache.
+      if (attempt.hadCachedBoard) return;
+    } else if (data === attempt.firstData) {
+      return;
+    }
+    logBoardLoadAttempt(attempt, "data");
+    setBoardRetryCount(0);
+  }, [data, error]);
 
   const inboxStageFilterKey = [...selectedInboxStages].sort().join(",");
   const inboxFilterKey = `${pipeId}|${selectedFilter}|${inboxStageFilterKey}`;
@@ -423,10 +554,10 @@ export default function KanbanPage() {
 
   const { user } = db.useAuth();
 
-  const pipe = data?.pipes?.[0] as any;
+  const pipe = boardData?.pipes?.[0] as any;
   const stages = (pipe?.stages?.sort((a: any, b: any) => a.position - b.position) || []) as any[];
   const emailTemplates = pipe?.email_templates || [];
-  const systemSettings = (data as any)?.system_settings?.[0];
+  const systemSettings = (boardData as any)?.system_settings?.[0];
 
   const liveInboxEmails =
     !inboxError &&
@@ -1105,7 +1236,8 @@ export default function KanbanPage() {
     ? stages.flatMap((s: any) => s.cards).find((c: any) => c.id === activeId)
     : null;
 
-  if (!kanbanDisplayLoaded || isLoading || (!error && data == null)) {
+  // Spinner on first load and while automatic retries run with no board to show.
+  if (!kanbanDisplayLoaded || (boardData == null && !boardRetriesExhausted)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -1116,11 +1248,24 @@ export default function KanbanPage() {
     );
   }
 
-  if (error || !pipe) {
+  if (!pipe) {
+    const errorHint = error?.hint == null ? "" : typeof error.hint === "string" ? error.hint : JSON.stringify(error.hint);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-red-600 mb-4">{t('errorLoading')}</p>
+          {error && (
+            <div className="mb-4">
+              {error.message && <p className="text-sm text-gray-600 max-w-xl break-words">{String(error.message)}</p>}
+              {errorHint && <p className="text-xs text-gray-500 max-w-xl break-words mt-1">{errorHint}</p>}
+              <button
+                onClick={retryBoardLoad}
+                className="mt-3 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                {t('retryLoadBoard')}
+              </button>
+            </div>
+          )}
           <Link href="/pipes" className="text-blue-600 hover:underline">
             {t('backToPipes')}
           </Link>
@@ -1136,6 +1281,16 @@ export default function KanbanPage() {
       </SignedOut>
       <SignedIn>
         <div className="min-h-screen bg-gray-50">
+          {boardIsStale && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-full shadow">
+              <span>{boardRetriesExhausted ? t('boardLoadFailed') : t('boardReconnecting')}</span>
+              {boardRetriesExhausted && (
+                <button onClick={retryBoardLoad} className="font-medium underline hover:text-amber-900 cursor-pointer">
+                  {t('retryLoadBoard')}
+                </button>
+              )}
+            </div>
+          )}
           {/* Top Header - FlowLane Brand */}
           <header className="bg-white">
             <div className="max-w-full px-4 sm:px-6 lg:px-8">
