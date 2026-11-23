@@ -63,10 +63,12 @@ type BoardLoadAttempt = {
   pipeId: string;
   attempt: number;
   startedAt: number;
-  // Whether this pipe's board was already on screen, in which case Instant
-  // hands back its cached result immediately on (re)subscribe.
-  hadCachedBoard: boolean;
-  firstData: unknown;
+  // Ms until Instant's stored copy of the board (browser storage or memory)
+  // was handed to the page, when that happened before the server replied.
+  cacheMs?: number;
+  // False when Instant's query store could not be found, so the server's
+  // reply cannot be timed and only errors are reported.
+  serverSignal: boolean;
   logged: boolean;
 };
 
@@ -75,10 +77,64 @@ function logBoardLoadAttempt(a: BoardLoadAttempt, outcome: string, errorMessage?
   console.info("[board-load]", {
     pipeId: a.pipeId,
     attempt: a.attempt,
+    source: a.serverSignal ? "server" : "hook",
     outcome,
     ms: Math.round(performance.now() - a.startedAt),
+    ...(a.cacheMs !== undefined ? { cacheMs: a.cacheMs } : {}),
     ...(errorMessage ? { error: errorMessage } : {}),
   });
+}
+
+// Read-only view of Instant 0.22's query store, db.core._reactor.querySubs
+// (a PersistedObject). Every add-query-ok or refresh-ok from the server writes
+// a new `result` object for the query's hash and then calls set(), which runs
+// subscribe() listeners synchronously. Results restored from browser storage
+// arrive in the single set() that ends the store's loading phase.
+type InstantQueryStore = {
+  currentValue: Record<string, { q?: unknown; result?: unknown } | undefined>;
+  isLoading: () => boolean;
+  subscribe: (cb: (value: unknown) => void) => () => void;
+};
+
+function getInstantQueryStore(): InstantQueryStore | null {
+  try {
+    const store = (db as any).core?._reactor?.querySubs;
+    if (
+      store &&
+      typeof store.subscribe === "function" &&
+      typeof store.isLoading === "function" &&
+      store.currentValue &&
+      typeof store.currentValue === "object"
+    ) {
+      return store as InstantQueryStore;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// JSON with sorted keys and undefined dropped: equal for two queries exactly
+// when Instant gives them the same hash (it ignores key order).
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return `{${Object.keys(obj)
+      .filter((k) => obj[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function findQueryHash(store: InstantQueryStore, query: unknown): string | null {
+  const target = canonicalJson(query);
+  for (const [hash, sub] of Object.entries(store.currentValue)) {
+    if (sub?.q !== undefined && canonicalJson(sub.q) === target) return hash;
+  }
+  return null;
 }
 
 export default function KanbanPage() {
@@ -363,9 +419,8 @@ export default function KanbanPage() {
         };
 
         pipeFilter.stages = { forms: {}, cards: cardsNested };
-        pipeFilter.email_templates = {};
 
-        return { pipes: pipeFilter, system_settings: {} };
+        return { pipes: pipeFilter };
       })()
     : null;
 
@@ -433,48 +488,74 @@ export default function KanbanPage() {
     setBoardSuspended(true);
   };
 
-  // Each subscribe of the board query is one load attempt, logged once.
+  // Each subscribe of the board query is one load attempt, logged once when the
+  // server replies (data or error), or on teardown if it never did.
+  // useQuery only reports data that differs from what it already shows, and
+  // Instant shows its stored copy first, so the server's data reply is read
+  // from Instant's query store instead: a new result object for this query's
+  // hash, other than the one restored from browser storage.
   const boardQueryKey = activeBoardQuery ? JSON.stringify(activeBoardQuery) : null;
   useEffect(() => {
     if (!boardQueryKey) return;
     boardAttemptNumberRef.current += 1;
+    const startedAt = performance.now();
+    // useQuery's own subscribe effect runs before this one, so the query is
+    // already in the store under its hash.
+    const store = getInstantQueryStore();
+    const hash = store ? findQueryHash(store, JSON.parse(boardQueryKey)) : null;
     const attempt: BoardLoadAttempt = {
       pipeId,
       attempt: boardAttemptNumberRef.current,
-      startedAt: performance.now(),
-      hadCachedBoard: lastGoodBoardRef.current?.pipeId === pipeId,
-      firstData: undefined,
+      startedAt,
+      serverSignal: hash !== null,
       logged: false,
     };
     boardAttemptRef.current = attempt;
+    let unsubscribe: (() => void) | null = null;
+    if (store && hash !== null) {
+      // A result present now was handed to useQuery on subscribe.
+      let seenResult = store.currentValue[hash]?.result ?? null;
+      if (seenResult) attempt.cacheMs = 0;
+      let wasLoading = store.isLoading();
+      unsubscribe = store.subscribe(() => {
+        // Runs inside Instant's store update: never throw from here.
+        try {
+          const loading = store.isLoading();
+          const isStorageRestore = wasLoading && !loading;
+          wasLoading = loading;
+          if (attempt.logged) return;
+          const result = store.currentValue[hash]?.result ?? null;
+          if (!result || result === seenResult) return;
+          seenResult = result;
+          if (isStorageRestore) {
+            if (attempt.cacheMs === undefined) {
+              attempt.cacheMs = Math.round(performance.now() - startedAt);
+            }
+            return;
+          }
+          logBoardLoadAttempt(attempt, "data");
+          // A real server reply with data resets the automatic retry budget.
+          setBoardRetryCount(0);
+        } catch {
+          // Ignore: timing is diagnostic only.
+        }
+      });
+    }
     return () => {
+      unsubscribe?.();
       if (!attempt.logged) {
-        logBoardLoadAttempt(attempt, attempt.firstData !== undefined ? "cached" : "no-reply");
+        logBoardLoadAttempt(attempt, attempt.serverSignal ? "no-reply" : "unmeasured");
       }
       if (boardAttemptRef.current === attempt) boardAttemptRef.current = null;
     };
   }, [boardQueryKey, pipeId]);
 
-  // Outcome of the current attempt: the first error, or the first data that
-  // did not come from Instant's cache. Fresh data also resets the retry budget.
+  // Query errors come from the server (a failed add-query or connection init).
   useEffect(() => {
     const attempt = boardAttemptRef.current;
-    if (!attempt || attempt.logged) return;
-    if (error) {
-      logBoardLoadAttempt(attempt, "error", typeof error?.message === "string" ? error.message : "unknown");
-      return;
-    }
-    if (data == null) return;
-    if (attempt.firstData === undefined) {
-      attempt.firstData = data;
-      // With a board already on screen, the first result is Instant's cache.
-      if (attempt.hadCachedBoard) return;
-    } else if (data === attempt.firstData) {
-      return;
-    }
-    logBoardLoadAttempt(attempt, "data");
-    setBoardRetryCount(0);
-  }, [data, error]);
+    if (!attempt || attempt.logged || !error) return;
+    logBoardLoadAttempt(attempt, "error", typeof error?.message === "string" ? error.message : "unknown");
+  }, [error]);
 
   const inboxStageFilterKey = [...selectedInboxStages].sort().join(",");
   const inboxFilterKey = `${pipeId}|${selectedFilter}|${inboxStageFilterKey}`;
@@ -526,6 +607,21 @@ export default function KanbanPage() {
     pageInfo: any;
   };
 
+  // Email templates and global variables are only used by the Inbox reply
+  // composer, so they load in Inbox view only, outside the board query.
+  const inboxTemplatesQuery =
+    currentView === "inbox"
+      ? {
+          pipes: {
+            $: { where: { id: pipeId } },
+            email_templates: {},
+          },
+          system_settings: {},
+        }
+      : null;
+
+  const { data: inboxTemplatesData } = db.useQuery(inboxTemplatesQuery as any) as { data: any };
+
   const selectedCardId =
     currentView === "inbox" && selectedEmail?.card?.id
       ? (selectedEmail.card.id as string)
@@ -556,8 +652,10 @@ export default function KanbanPage() {
 
   const pipe = boardData?.pipes?.[0] as any;
   const stages = (pipe?.stages?.sort((a: any, b: any) => a.position - b.position) || []) as any[];
-  const emailTemplates = pipe?.email_templates || [];
-  const systemSettings = (boardData as any)?.system_settings?.[0];
+  // Ignore another pipe's templates briefly returned right after pipeId changes.
+  const inboxTemplatesPipe = inboxTemplatesData?.pipes?.[0];
+  const emailTemplates = (inboxTemplatesPipe?.id === pipeId ? inboxTemplatesPipe?.email_templates : null) || [];
+  const systemSettings = inboxTemplatesData?.system_settings?.[0];
 
   const liveInboxEmails =
     !inboxError &&
